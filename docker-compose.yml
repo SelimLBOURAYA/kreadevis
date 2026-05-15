@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: app1-postgres
+    environment:
+      POSTGRES_DB: app1db
+      POSTGRES_USER: app1user
+      POSTGRES_PASSWORD: app1pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
