@@ -1,4 +1,4 @@
-package com.slim.kreadevis_backend.model;
+package com.slim.kreadevis_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
