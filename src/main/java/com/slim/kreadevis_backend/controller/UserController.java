@@ -1,6 +1,6 @@
 package com.slim.kreadevis_backend.controller;
 
-import com.slim.kreadevis_backend.model.User;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

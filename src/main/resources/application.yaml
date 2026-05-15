@@ -1,9 +1,60 @@
 spring:
+  application:
+    name: kreadevis-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/app1db
-    username: app1user
-    password: app1pass
+    url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/app1db}
+    username: ${DATASOURCE_USERNAME:app1user}
+    password: ${DATASOURCE_PASSWORD:app1pass}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# --- App config ---
+app:
+  jwt:
+    secret: ${JWT_SECRET:changeme-256-bit-secret-key}
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 86400000
+  company:
+    name: "BMI PLOMBERIE CHAUFFAGE SALLE DE BAIN"
+    address: ""
+    phone: ""
+    email: ""
+    siren: "893774851"
+  document:
+    logo-path: ${DOC_LOGO_PATH:classpath:static/logo.png}
+    output-dir: ${DOC_OUTPUT_DIR:/tmp/kreadevis/documents}
+    facture-dir: ${DOC_FACTURE_DIR:/tmp/kreadevis/factures}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+logging:
+  level:
+    com.slim: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+logging:
+  level:
+    com.slim: INFO
