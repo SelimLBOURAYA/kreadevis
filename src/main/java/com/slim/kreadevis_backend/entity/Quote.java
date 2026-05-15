@@ -11,7 +11,7 @@ import java.time.LocalDate;
 @Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = {"client", "counter"})
+@ToString(exclude = {"client"})
 public class Quote {
 
     @Id
@@ -28,14 +28,13 @@ public class Quote {
     @Column(name = "reference_code")
     private String referenceCode;
 
+    @Column(name = "daily_sequence")
+    private int dailySequence;
+
     @Column(columnDefinition = "BOOLEAN DEFAULT false")
     private boolean finished;
 
     @ManyToOne
     @JsonIgnoreProperties("quotes")
     private Client client;
-
-    @OneToOne
-    @JoinColumn(name = "counter_id")
-    private QuoteCounter counter;
 }
