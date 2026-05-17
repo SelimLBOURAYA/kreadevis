@@ -1,0 +1,17 @@
+package com.slim.kreadevis_backend.mapper;
+
+import com.slim.kreadevis_backend.dto.client.ClientRequest;
+import com.slim.kreadevis_backend.dto.client.ClientResponse;
+import com.slim.kreadevis_backend.entity.Client;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = "spring", uses = {AddressMapper.class})
+public interface ClientMapper {
+    ClientResponse toResponse(Client client);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "address", ignore = true)
+    @Mapping(target = "quotes", ignore = true)
+    Client toEntity(ClientRequest request);
+}
