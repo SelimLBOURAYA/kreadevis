@@ -3,10 +3,11 @@ package com.slim.kreadevis_backend.service;
 import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface QuoteService {
-    List<QuoteResponse> findAll();
+    List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate);
     QuoteResponse findById(Long id);
     List<QuoteResponse> findByClientId(Long clientId);
     QuoteResponse findByReferenceCode(String referenceCode);

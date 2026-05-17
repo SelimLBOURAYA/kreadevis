@@ -29,8 +29,8 @@ public class QuoteServiceImpl implements QuoteService {
     private final QuoteMapper quoteMapper;
 
     @Override
-    public List<QuoteResponse> findAll() {
-        return quoteRepository.findAll().stream().map(quoteMapper::toResponse).toList();
+    public List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate) {
+        return quoteRepository.findByDateRange(startDate, endDate).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override

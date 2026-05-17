@@ -8,9 +8,11 @@ import com.slim.kreadevis_backend.service.QuoteItemService;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -21,8 +23,10 @@ public class QuoteController {
     private final QuoteItemService quoteItemService;
 
     @GetMapping("/api/quotes")
-    public ResponseEntity<List<QuoteResponse>> getAll() {
-        return ResponseEntity.ok(quoteService.findAll());
+    public ResponseEntity<List<QuoteResponse>> getAll(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(quoteService.findAll(startDate, endDate));
     }
 
     @GetMapping("/api/quotes/{id}")

@@ -14,6 +14,9 @@ public interface QuoteRepository extends JpaRepository<Quote, Long> {
 
     List<Quote> findByClientId(Long clientId);
 
+    @Query("SELECT q FROM Quote q WHERE (:startDate IS NULL OR q.date >= :startDate) AND (:endDate IS NULL OR q.date <= :endDate)")
+    List<Quote> findByDateRange(LocalDate startDate, LocalDate endDate);
+
     Optional<Quote> findByReferenceCode(String referenceCode);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
