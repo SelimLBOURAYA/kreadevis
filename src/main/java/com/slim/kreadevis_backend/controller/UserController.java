@@ -1,8 +1,9 @@
 package com.slim.kreadevis_backend.controller;
 
-import com.slim.kreadevis_backend.entity.User;
-import com.slim.kreadevis_backend.repository.UserRepository;
+import com.slim.kreadevis_backend.dto.user.UserResponse;
+import com.slim.kreadevis_backend.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,26 +13,21 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     @GetMapping
-    public List<User> getAll() {
-        return userRepository.findAll();
-    }
-
-    @PostMapping
-    public User create(@RequestBody User user) {
-        return userRepository.save(user);
+    public ResponseEntity<List<UserResponse>> getAll() {
+        return ResponseEntity.ok(userService.findAll());
     }
 
     @GetMapping("/{id}")
-    public User getById(@PathVariable Long id) {
-        return userRepository.findById(id).orElseThrow();
+    public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.findById(id));
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        userRepository.deleteById(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        userService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }
-
