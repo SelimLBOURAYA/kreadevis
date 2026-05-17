@@ -9,6 +9,7 @@ import lombok.*;
 @Getter @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString(exclude = {"product", "quote"})
 public class QuoteItem {
 

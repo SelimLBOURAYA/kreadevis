@@ -2,17 +2,17 @@ package com.slim.kreadevis_backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Table(name = "clients")
-@Data
+@Getter @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @ToString(exclude = {"address", "quotes"})
 public class Client {
 

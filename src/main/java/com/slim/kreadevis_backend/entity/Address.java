@@ -1,13 +1,14 @@
 package com.slim.kreadevis_backend.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "addresses")
-@Data
+@Getter @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Address {
 
     @Id
