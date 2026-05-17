@@ -55,6 +55,9 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     public void delete(Long id) {
-        professionalRepository.deleteById(id);
+        Professional professional = professionalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + id));
+        professional.setDeleted(true);
+        professionalRepository.save(professional);
     }
 }

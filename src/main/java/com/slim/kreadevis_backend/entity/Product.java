@@ -2,6 +2,7 @@ package com.slim.kreadevis_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "products")
@@ -10,6 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = "supplier")
+@SQLRestriction("deleted = false")
 public class Product {
 
     @Id
@@ -37,4 +39,7 @@ public class Product {
 
     @ManyToOne
     private Professional supplier;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean deleted;
 }

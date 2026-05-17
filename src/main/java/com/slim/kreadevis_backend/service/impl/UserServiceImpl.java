@@ -1,6 +1,7 @@
 package com.slim.kreadevis_backend.service.impl;
 
 import com.slim.kreadevis_backend.dto.user.UserResponse;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.UserMapper;
 import com.slim.kreadevis_backend.repository.UserRepository;
 import com.slim.kreadevis_backend.service.UserService;
@@ -30,6 +31,9 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void delete(Long id) {
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+        user.setDeleted(true);
+        userRepository.save(user);
     }
 }

@@ -48,6 +48,9 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public void delete(Long id) {
-        addressRepository.deleteById(id);
+        Address address = addressRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Address not found: " + id));
+        address.setDeleted(true);
+        addressRepository.save(address);
     }
 }

@@ -3,8 +3,11 @@ package com.slim.kreadevis_backend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "quotes")
@@ -12,7 +15,8 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"client"})
+@ToString(exclude = {"client", "items"})
+@SQLRestriction("deleted = false")
 public class Quote {
 
     @Id
@@ -32,10 +36,19 @@ public class Quote {
     @Column(name = "daily_sequence")
     private int dailySequence;
 
-    @Column(columnDefinition = "BOOLEAN DEFAULT false")
-    private boolean finished;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private QuoteStatus status = QuoteStatus.DRAFT;
 
     @ManyToOne
     @JsonIgnoreProperties("quotes")
     private Client client;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean deleted;
+
+    @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<QuoteItem> items = new ArrayList<>();
 }
