@@ -20,12 +20,12 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponse> findAll() {
-        return userRepository.findAll().stream().map(userMapper::toResponse).toList();
+        return userRepository.findAllByActiveTrue().stream().map(userMapper::toResponse).toList();
     }
 
     @Override
     public UserResponse findById(Long id) {
-        return userMapper.toResponse(userRepository.findById(id)
+        return userMapper.toResponse(userRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id)));
     }
 
@@ -33,7 +33,7 @@ public class UserServiceImpl implements UserService {
     public void delete(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
-        user.setDeleted(true);
+        user.setActive(false);
         userRepository.save(user);
     }
 }

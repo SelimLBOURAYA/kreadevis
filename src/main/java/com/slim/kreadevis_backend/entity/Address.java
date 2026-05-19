@@ -2,7 +2,6 @@ package com.slim.kreadevis_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "addresses")
@@ -11,7 +10,6 @@ import org.hibernate.annotations.SQLRestriction;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@SQLRestriction("deleted = false")
 public class Address {
 
     @Id
@@ -31,6 +29,7 @@ public class Address {
     @Column(name = "city")
     private String city;
 
-    @Column(columnDefinition = "boolean default false")
-    private boolean deleted;
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

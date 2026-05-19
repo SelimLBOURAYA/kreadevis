@@ -3,7 +3,6 @@ package com.slim.kreadevis_backend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "quote_items")
@@ -12,7 +11,6 @@ import org.hibernate.annotations.SQLRestriction;
 @AllArgsConstructor
 @Builder
 @ToString(exclude = {"product", "quote"})
-@SQLRestriction("deleted = false")
 public class QuoteItem {
 
     @Id
@@ -37,6 +35,7 @@ public class QuoteItem {
     @JsonIgnoreProperties("items")
     private Quote quote;
 
-    @Column(columnDefinition = "boolean default false")
-    private boolean deleted;
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

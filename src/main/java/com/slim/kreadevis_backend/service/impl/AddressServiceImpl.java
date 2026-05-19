@@ -21,12 +21,12 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public List<AddressResponse> findAll() {
-        return addressRepository.findAll().stream().map(addressMapper::toResponse).toList();
+        return addressRepository.findAllByActiveTrue().stream().map(addressMapper::toResponse).toList();
     }
 
     @Override
     public AddressResponse findById(Long id) {
-        return addressMapper.toResponse(addressRepository.findById(id)
+        return addressMapper.toResponse(addressRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + id)));
     }
 
@@ -37,7 +37,7 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public AddressResponse update(Long id, AddressRequest request) {
-        Address address = addressRepository.findById(id)
+        Address address = addressRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + id));
         address.setStreetNumber(request.streetNumber());
         address.setStreet(request.street());
@@ -50,7 +50,7 @@ public class AddressServiceImpl implements AddressService {
     public void delete(Long id) {
         Address address = addressRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + id));
-        address.setDeleted(true);
+        address.setActive(false);
         addressRepository.save(address);
     }
 }

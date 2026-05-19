@@ -3,17 +3,20 @@ package com.slim.kreadevis_backend.repository;
 import com.slim.kreadevis_backend.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByEmail(String email);
+    List<User> findAllByActiveTrue();
 
-    Optional<User> findOneByEmailIgnoreCase(String email);
+    Optional<User> findByIdAndActiveTrue(Long id);
 
-    Optional<User> findByLogin(String login);
+    Optional<User> findByEmailAndActiveTrue(String email);
 
-    boolean existsByLogin(String login);
+    Optional<User> findByLoginAndActiveTrue(String login);
 
-    boolean existsByEmail(String email);
+    boolean existsByLoginAndActiveTrue(String login);
+
+    boolean existsByEmailAndActiveTrue(String email);
 }

@@ -3,7 +3,6 @@ package com.slim.kreadevis_backend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -15,8 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"client", "items"})
-@SQLRestriction("deleted = false")
+@ToString(exclude = {"client", "items", "createdBy"})
 public class Quote {
 
     @Id
@@ -45,8 +43,13 @@ public class Quote {
     @JsonIgnoreProperties("quotes")
     private Client client;
 
-    @Column(columnDefinition = "boolean default false")
-    private boolean deleted;
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL)
     @Builder.Default

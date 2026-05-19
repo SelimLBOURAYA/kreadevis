@@ -3,7 +3,6 @@ package com.slim.kreadevis_backend.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -16,7 +15,6 @@ import java.util.Set;
 @Builder
 @EqualsAndHashCode(of = "id")
 @ToString(exclude = {"address", "quotes"})
-@SQLRestriction("deleted = false")
 public class Client {
 
     @Id
@@ -48,8 +46,9 @@ public class Client {
     @Column(length = 254, unique = true)
     private String email;
 
-    @Column(columnDefinition = "boolean default false")
-    private boolean deleted;
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 
     @OneToMany(mappedBy = "client")
     @JsonIgnoreProperties("client")

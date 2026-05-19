@@ -5,12 +5,16 @@ import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
 import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.entity.QuoteStatus;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ClientRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.repository.UserRepository;
+import com.slim.kreadevis_backend.security.UserDetailsImpl;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,7 @@ public class QuoteServiceImpl implements QuoteService {
 
     private final QuoteRepository quoteRepository;
     private final ClientRepository clientRepository;
+    private final UserRepository userRepository;
     private final QuoteMapper quoteMapper;
 
     @Override
@@ -35,34 +40,37 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     public QuoteResponse findById(Long id) {
-        return quoteMapper.toResponse(quoteRepository.findById(id)
+        return quoteMapper.toResponse(quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id)));
     }
 
     @Override
     public List<QuoteResponse> findByClientId(Long clientId) {
-        return quoteRepository.findByClientId(clientId).stream().map(quoteMapper::toResponse).toList();
+        return quoteRepository.findByClientIdAndActiveTrue(clientId).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
     public QuoteResponse findByReferenceCode(String referenceCode) {
-        return quoteMapper.toResponse(quoteRepository.findByReferenceCode(referenceCode)
+        return quoteMapper.toResponse(quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
     }
 
     @Override
     @Transactional
     public QuoteResponse create(QuoteRequest request) {
-        Client client = clientRepository.findById(request.clientId())
+        Client client = clientRepository.findByIdAndActiveTrue(request.clientId())
                 .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()));
-        Quote quote = Quote.builder().client(client).build();
+        Quote quote = Quote.builder()
+                .client(client)
+                .createdBy(getCurrentUser())
+                .build();
         return quoteMapper.toResponse(quoteRepository.save(quote));
     }
 
     @Override
     @Transactional
     public QuoteResponse finalize(Long id) {
-        Quote quote = quoteRepository.findById(id)
+        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
 
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
@@ -72,10 +80,11 @@ public class QuoteServiceImpl implements QuoteService {
             throw new IllegalStateException("Cannot finalize a cancelled quote");
         }
 
+        User currentUser = getCurrentUser();
         LocalDate today = LocalDate.now();
-        int nextSequence = quoteRepository.findMaxDailySequenceByDate(today).orElse(0) + 1;
+        int nextSequence = quoteRepository.findMaxDailySequenceByUserAndDate(currentUser.getId(), today) + 1;
         quote.setDailySequence(nextSequence);
-        quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + String.format("%03d", nextSequence));
+        quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
         quote.setStatus(QuoteStatus.FINALIZED);
 
         float total = quote.getItems().stream()
@@ -88,7 +97,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public QuoteResponse pending(Long id) {
-        Quote quote = quoteRepository.findById(id)
+        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
         if (quote.getStatus() == QuoteStatus.CANCELLED) {
             throw new IllegalStateException("Cannot set a cancelled quote to pending");
@@ -100,7 +109,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public QuoteResponse cancel(Long id) {
-        Quote quote = quoteRepository.findById(id)
+        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
             throw new IllegalStateException("Cannot cancel a finalized quote");
@@ -114,8 +123,15 @@ public class QuoteServiceImpl implements QuoteService {
     public void delete(Long id) {
         Quote quote = quoteRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
-        quote.getItems().forEach(item -> item.setDeleted(true));
-        quote.setDeleted(true);
+        quote.getItems().forEach(item -> item.setActive(false));
+        quote.setActive(false);
         quoteRepository.save(quote);
+    }
+
+    private User getCurrentUser() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        var userDetails = (UserDetailsImpl) auth.getPrincipal();
+        return userRepository.findById(userDetails.getId())
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in DB"));
     }
 }

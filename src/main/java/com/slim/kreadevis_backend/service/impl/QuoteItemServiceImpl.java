@@ -27,9 +27,9 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     @Override
     @Transactional
     public QuoteItemResponse addItem(Long quoteId, QuoteItemRequest request) {
-        Quote quote = quoteRepository.findById(quoteId)
+        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
-        Product product = productRepository.findById(request.productId())
+        Product product = productRepository.findByIdAndActiveTrue(request.productId())
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
 
         QuoteItem item = QuoteItem.builder()
@@ -46,9 +46,9 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     @Override
     @Transactional
     public QuoteItemResponse updateItem(Long quoteId, Long itemId, QuoteItemRequest request) {
-        QuoteItem item = quoteItemRepository.findById(itemId)
+        QuoteItem item = quoteItemRepository.findByIdAndActiveTrue(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
-        Product product = productRepository.findById(request.productId())
+        Product product = productRepository.findByIdAndActiveTrue(request.productId())
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
 
         item.setProduct(product);
@@ -64,7 +64,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     public void deleteItem(Long quoteId, Long itemId) {
         QuoteItem item = quoteItemRepository.findById(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
-        item.setDeleted(true);
+        item.setActive(false);
         quoteItemRepository.save(item);
     }
 }
