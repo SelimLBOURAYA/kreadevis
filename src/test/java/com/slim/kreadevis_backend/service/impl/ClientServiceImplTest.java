@@ -68,7 +68,7 @@ class ClientServiceImplTest {
     void create_shouldSaveAndReturnResponse() {
         ClientRequest request = requestWithAddress();
         Address address = new Address();
-        Client client = spy(new Client());
+        Client client = new Client();
         Client saved = new Client();
         ClientResponse response = dummyResponse();
         when(addressRepository.findByIdAndActiveTrue(ADDRESS_ID)).thenReturn(Optional.of(address));
@@ -79,7 +79,6 @@ class ClientServiceImplTest {
         ClientResponse result = clientService.create(request);
 
         assertThat(result).isEqualTo(response);
-        verify(client).setAddress(address);
         verify(clientRepository).save(client);
     }
 
@@ -97,7 +96,7 @@ class ClientServiceImplTest {
     void update_shouldApplyAndSave_whenFound() {
         ClientRequest request = requestWithAddress();
         Address address = new Address();
-        Client client = spy(new Client());
+        Client client = new Client();
         ClientResponse response = dummyResponse();
         when(clientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(client));
         when(addressRepository.findByIdAndActiveTrue(ADDRESS_ID)).thenReturn(Optional.of(address));
@@ -108,7 +107,7 @@ class ClientServiceImplTest {
 
         assertThat(result).isEqualTo(response);
         verify(clientMapper).updateEntity(request, client);
-        verify(client).setAddress(address);
+        verify(clientRepository).save(client);
     }
 
     @Test

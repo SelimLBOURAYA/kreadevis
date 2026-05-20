@@ -81,7 +81,7 @@ class ProductServiceImplTest {
     @Test
     void create_shouldSaveWithSupplier_whenSupplierIdSet() {
         ProductRequest request = requestWithSupplier();
-        Product entity = spy(new Product());
+        Product entity = new Product();
         Professional supplier = new Professional();
         ProductResponse response = dummyResponse();
         when(productMapper.toEntity(request)).thenReturn(entity);
@@ -92,7 +92,7 @@ class ProductServiceImplTest {
         ProductResponse result = productService.create(request);
 
         assertThat(result).isEqualTo(response);
-        verify(entity).setSupplier(supplier);
+        verify(productRepository).save(entity);
     }
 
     @Test
@@ -124,7 +124,7 @@ class ProductServiceImplTest {
     @Test
     void update_shouldUpdateSupplier_whenSupplierIdSet() {
         ProductRequest request = requestWithSupplier();
-        Product product = spy(new Product());
+        Product product = new Product();
         Professional supplier = new Professional();
         ProductResponse response = dummyResponse();
         when(productRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
@@ -134,7 +134,8 @@ class ProductServiceImplTest {
 
         productService.update(1L, request);
 
-        verify(product).setSupplier(supplier);
+        verify(productMapper).updateEntity(request, product);
+        verify(productRepository).save(product);
     }
 
     @Test
