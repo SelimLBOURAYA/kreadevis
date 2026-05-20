@@ -5,6 +5,7 @@ import com.slim.kreadevis_backend.dto.professional.ProfessionalResponse;
 import com.slim.kreadevis_backend.entity.Professional;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
 
 @Mapper(componentModel = "spring")
 public interface ProfessionalMapper {
@@ -13,4 +14,9 @@ public interface ProfessionalMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "user", ignore = true)
     Professional toEntity(ProfessionalRequest request);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "active", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    void updateEntity(ProfessionalRequest request, @MappingTarget Professional professional);
 }

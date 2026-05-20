@@ -48,14 +48,7 @@ public class ClientServiceImpl implements ClientService {
                 .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
         Address address = addressRepository.findByIdAndActiveTrue(request.addressId())
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + request.addressId()));
-        client.setFirstName(request.firstName());
-        client.setLastName(request.lastName());
-        client.setCompany(request.company());
-        client.setSiret(request.siret());
-        client.setSiren(request.siren());
-        client.setVatCode(request.vatCode());
-        client.setPhone(request.phone());
-        client.setEmail(request.email());
+        clientMapper.updateEntity(request, client);
         client.setAddress(address);
         return clientMapper.toResponse(clientRepository.save(client));
     }

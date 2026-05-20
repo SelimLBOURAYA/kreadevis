@@ -39,17 +39,7 @@ public class ProfessionalServiceImpl implements ProfessionalService {
     public ProfessionalResponse update(Long id, ProfessionalRequest request) {
         Professional professional = professionalRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + id));
-        professional.setFirstName(request.firstName());
-        professional.setLastName(request.lastName());
-        professional.setPhone(request.phone());
-        professional.setContactEmail(request.contactEmail());
-        professional.setStreetNumber(request.streetNumber());
-        professional.setStreet(request.street());
-        professional.setZipCode(request.zipCode());
-        professional.setCity(request.city());
-        professional.setCompany(request.company());
-        professional.setVat(request.vat());
-        professional.setSiren(request.siren());
+        professionalMapper.updateEntity(request, professional);
         return professionalMapper.toResponse(professionalRepository.save(professional));
     }
 

@@ -39,10 +39,7 @@ public class AddressServiceImpl implements AddressService {
     public AddressResponse update(Long id, AddressRequest request) {
         Address address = addressRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + id));
-        address.setStreetNumber(request.streetNumber());
-        address.setStreet(request.street());
-        address.setPostalCode(request.postalCode());
-        address.setCity(request.city());
+        addressMapper.updateEntity(request, address);
         return addressMapper.toResponse(addressRepository.save(address));
     }
 

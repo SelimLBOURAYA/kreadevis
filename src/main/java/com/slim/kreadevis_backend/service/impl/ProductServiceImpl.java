@@ -48,12 +48,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
-        product.setLabel(request.label());
-        product.setDescription(request.description());
-        product.setStockQuantity(request.stockQuantity());
-        product.setUnitPrice(request.unitPrice());
-        product.setVatRate(request.vatRate());
-        product.setReferenceCode(request.referenceCode());
+        productMapper.updateEntity(request, product);
         if (request.supplierId() != null) {
             Professional supplier = professionalRepository.findByIdAndActiveTrue(request.supplierId())
                     .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + request.supplierId()));
