@@ -34,4 +34,8 @@ public class QuoteItem {
     @ManyToOne
     @JsonIgnoreProperties("items")
     private Quote quote;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

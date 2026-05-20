@@ -28,4 +28,8 @@ public class Address {
 
     @Column(name = "city")
     private String city;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

@@ -46,6 +46,10 @@ public class Client {
     @Column(length = 254, unique = true)
     private String email;
 
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
+
     @OneToMany(mappedBy = "client")
     @JsonIgnoreProperties("client")
     private Set<Quote> quotes = new HashSet<>();

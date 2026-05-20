@@ -37,4 +37,8 @@ public class Product {
 
     @ManyToOne
     private Professional supplier;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

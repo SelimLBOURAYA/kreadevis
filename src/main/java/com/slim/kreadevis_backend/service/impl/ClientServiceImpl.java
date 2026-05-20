@@ -24,18 +24,18 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public List<ClientResponse> findAll() {
-        return clientRepository.findAll().stream().map(clientMapper::toResponse).toList();
+        return clientRepository.findAllByActiveTrue().stream().map(clientMapper::toResponse).toList();
     }
 
     @Override
     public ClientResponse findById(Long id) {
-        return clientMapper.toResponse(clientRepository.findById(id)
+        return clientMapper.toResponse(clientRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id)));
     }
 
     @Override
     public ClientResponse create(ClientRequest request) {
-        Address address = addressRepository.findById(request.addressId())
+        Address address = addressRepository.findByIdAndActiveTrue(request.addressId())
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + request.addressId()));
         Client client = clientMapper.toEntity(request);
         client.setAddress(address);
@@ -44,24 +44,20 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public ClientResponse update(Long id, ClientRequest request) {
-        Client client = clientRepository.findById(id)
+        Client client = clientRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
-        Address address = addressRepository.findById(request.addressId())
+        Address address = addressRepository.findByIdAndActiveTrue(request.addressId())
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + request.addressId()));
-        client.setFirstName(request.firstName());
-        client.setLastName(request.lastName());
-        client.setCompany(request.company());
-        client.setSiret(request.siret());
-        client.setSiren(request.siren());
-        client.setVatCode(request.vatCode());
-        client.setPhone(request.phone());
-        client.setEmail(request.email());
+        clientMapper.updateEntity(request, client);
         client.setAddress(address);
         return clientMapper.toResponse(clientRepository.save(client));
     }
 
     @Override
     public void delete(Long id) {
-        clientRepository.deleteById(id);
+        Client client = clientRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
+        client.setActive(false);
+        clientRepository.save(client);
     }
 }

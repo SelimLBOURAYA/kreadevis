@@ -50,4 +50,8 @@ public class Professional {
     @OneToOne
     @JoinColumn(unique = true)
     private User user;
+
+    @Builder.Default
+    @Column(columnDefinition = "boolean default true")
+    private boolean active = true;
 }

@@ -10,10 +10,15 @@ import java.util.Optional;
 
 public interface QuoteRepository extends JpaRepository<Quote, Long> {
 
-    List<Quote> findByClientId(Long clientId);
+    List<Quote> findByClientIdAndActiveTrue(Long clientId);
 
-    Optional<Quote> findByReferenceCode(String referenceCode);
+    @Query("SELECT q FROM Quote q WHERE q.active = true AND (:startDate IS NULL OR q.date >= :startDate) AND (:endDate IS NULL OR q.date <= :endDate)")
+    List<Quote> findByDateRange(LocalDate startDate, LocalDate endDate);
 
-    @Query("SELECT MAX(q.dailySequence) FROM Quote q WHERE q.date = :date")
-    Optional<Integer> findMaxDailySequenceByDate(LocalDate date);
+    Optional<Quote> findByReferenceCodeAndActiveTrue(String referenceCode);
+
+    Optional<Quote> findByIdAndActiveTrue(Long id);
+
+    @Query("SELECT COALESCE(MAX(q.dailySequence), 0) FROM Quote q WHERE q.createdBy.id = :userId AND q.date = :date")
+    int findMaxDailySequenceByUserAndDate(Long userId, LocalDate date);
 }

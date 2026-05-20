@@ -24,12 +24,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> findAll() {
-        return productRepository.findAll().stream().map(productMapper::toResponse).toList();
+        return productRepository.findAllByActiveTrue().stream().map(productMapper::toResponse).toList();
     }
 
     @Override
     public ProductResponse findById(Long id) {
-        return productMapper.toResponse(productRepository.findById(id)
+        return productMapper.toResponse(productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id)));
     }
 
@@ -37,7 +37,7 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse create(ProductRequest request) {
         Product product = productMapper.toEntity(request);
         if (request.supplierId() != null) {
-            Professional supplier = professionalRepository.findById(request.supplierId())
+            Professional supplier = professionalRepository.findByIdAndActiveTrue(request.supplierId())
                     .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + request.supplierId()));
             product.setSupplier(supplier);
         }
@@ -46,16 +46,11 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public ProductResponse update(Long id, ProductRequest request) {
-        Product product = productRepository.findById(id)
+        Product product = productRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
-        product.setLabel(request.label());
-        product.setDescription(request.description());
-        product.setStockQuantity(request.stockQuantity());
-        product.setUnitPrice(request.unitPrice());
-        product.setVatRate(request.vatRate());
-        product.setReferenceCode(request.referenceCode());
+        productMapper.updateEntity(request, product);
         if (request.supplierId() != null) {
-            Professional supplier = professionalRepository.findById(request.supplierId())
+            Professional supplier = professionalRepository.findByIdAndActiveTrue(request.supplierId())
                     .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + request.supplierId()));
             product.setSupplier(supplier);
         }
@@ -64,6 +59,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public void delete(Long id) {
-        productRepository.deleteById(id);
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
+        product.setActive(false);
+        productRepository.save(product);
     }
 }

@@ -21,12 +21,12 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     public List<ProfessionalResponse> findAll() {
-        return professionalRepository.findAll().stream().map(professionalMapper::toResponse).toList();
+        return professionalRepository.findAllByActiveTrue().stream().map(professionalMapper::toResponse).toList();
     }
 
     @Override
     public ProfessionalResponse findById(Long id) {
-        return professionalMapper.toResponse(professionalRepository.findById(id)
+        return professionalMapper.toResponse(professionalRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + id)));
     }
 
@@ -37,24 +37,17 @@ public class ProfessionalServiceImpl implements ProfessionalService {
 
     @Override
     public ProfessionalResponse update(Long id, ProfessionalRequest request) {
-        Professional professional = professionalRepository.findById(id)
+        Professional professional = professionalRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + id));
-        professional.setFirstName(request.firstName());
-        professional.setLastName(request.lastName());
-        professional.setPhone(request.phone());
-        professional.setContactEmail(request.contactEmail());
-        professional.setStreetNumber(request.streetNumber());
-        professional.setStreet(request.street());
-        professional.setZipCode(request.zipCode());
-        professional.setCity(request.city());
-        professional.setCompany(request.company());
-        professional.setVat(request.vat());
-        professional.setSiren(request.siren());
+        professionalMapper.updateEntity(request, professional);
         return professionalMapper.toResponse(professionalRepository.save(professional));
     }
 
     @Override
     public void delete(Long id) {
-        professionalRepository.deleteById(id);
+        Professional professional = professionalRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Professional not found: " + id));
+        professional.setActive(false);
+        professionalRepository.save(professional);
     }
 }
