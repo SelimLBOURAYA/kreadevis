@@ -80,16 +80,9 @@ public class QuoteServiceImpl implements QuoteService {
             throw new IllegalStateException("Cannot finalize a cancelled quote");
         }
 
-        User currentUser = getCurrentUser();
-        LocalDate today = LocalDate.now();
-        int nextSequence = quoteRepository.findMaxDailySequenceByUserAndDate(currentUser.getId(), today) + 1;
-        quote.setDailySequence(nextSequence);
-        quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
+        assignReferenceCode(quote);
         quote.setStatus(QuoteStatus.FINALIZED);
-
-        float total = quote.getItems().stream()
-                .reduce(0f, (acc, item) -> acc + item.getTotalPrice(), Float::sum);
-        quote.setTotalPrice(total);
+        quote.setTotalPrice(computeTotalPrice(quote));
 
         return quoteMapper.toResponse(quoteRepository.save(quote));
     }
@@ -126,6 +119,19 @@ public class QuoteServiceImpl implements QuoteService {
         quote.getItems().forEach(item -> item.setActive(false));
         quote.setActive(false);
         quoteRepository.save(quote);
+    }
+
+    private void assignReferenceCode(Quote quote) {
+        User currentUser = getCurrentUser();
+        LocalDate today = LocalDate.now();
+        int nextSequence = quoteRepository.findMaxDailySequenceByUserAndDate(currentUser.getId(), today) + 1;
+        quote.setDailySequence(nextSequence);
+        quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
+    }
+
+    private float computeTotalPrice(Quote quote) {
+        return quote.getItems().stream()
+                .reduce(0f, (acc, item) -> acc + item.getTotalPrice(), Float::sum);
     }
 
     private User getCurrentUser() {
