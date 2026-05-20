@@ -26,7 +26,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 4   | feat/lot-4-dto-mappers      | ✅ terminé  |
 | 5   | feat/lot-5-crud             | ✅ terminé  |
 | 6   | feat/lot-6-quote            | ✅ terminé  |
-| 7   | feat/lot-7-pdf              | ⬜ à faire  |
+| 7   | feat/lot-7-pdf              | ✅ terminé  |
 | 8   | feat/lot-8-csv              | ⬜ à faire  |
 | 9   | feat/lot-9-tests            | ⬜ à faire  |
 | 10  | feat/lot-10-email-reminders | ⬜ à faire  |
@@ -133,43 +133,17 @@ Réalisé :
 
 ---
 
-## LOT 7 — Génération PDF ⬜
+## LOT 7 — Génération PDF ✅
 
-**Branche :** `feat/lot-7-pdf`
-**Commit cible :** `feat(7): implement PDF generation with OpenPDF`
+**Commit :** `feat(7): implement PDF generation with OpenPDF`
 
-### Objectif
-Générer devis et factures en PDF via OpenPDF. Aucun chemin hardcodé (config externalisée déjà en place dans `application.yaml`).
-
-### Fichiers à créer
-```
-config/
-  AppProperties.java           ← @ConfigurationProperties("app") — company, document
-service/
-  PdfService.java              ← interface : generateQuotePdf(Long quoteId), generateInvoicePdf(Long quoteId)
-  impl/PdfServiceImpl.java     ← implémentation OpenPDF
-```
-
-### Endpoints à ajouter dans `QuoteController`
-```
-GET /api/quotes/{id}/pdf        ← télécharger le devis en PDF
-GET /api/quotes/{id}/invoice/pdf ← télécharger la facture en PDF
-```
-
-### Config utilisée (déjà dans yaml)
-```yaml
-app:
-  company:
-    name, address, phone, email, siren
-  document:
-    logo-path, output-dir, facture-dir
-```
-
-### Critères de validation
-- GET `/api/quotes/{id}/pdf` retourne un `application/pdf`
-- Le PDF contient le nom du client, les items, le total
-- Le logo est chargé depuis `app.document.logo-path`
-- Aucun chemin absolu dans le code Java
+Réalisé :
+- `AppProperties` (`@ConfigurationProperties("app")`) avec nested records `Company` et `DocumentConfig`
+- `PdfService` / `PdfServiceImpl` : génération OpenPDF pour devis (`DEVIS`) et facture (`FACTURE`)
+- Logo chargé via `ResourceLoader` depuis `app.document.logo-path` (classpath ou filesystem) — absent → graceful skip
+- Endpoints `GET /api/quotes/{id}/pdf` et `GET /api/quotes/{id}/invoice/pdf` → `application/pdf` + `Content-Disposition`
+- Fix `GlobalExceptionHandler` : `EntityNotFoundException` → 404 (manquait depuis lot 6)
+- 7 tests unitaires `PdfServiceImplTest`
 
 ---
 

@@ -4,11 +4,14 @@ import com.slim.kreadevis_backend.dto.quote.QuoteItemRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteItemResponse;
 import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
+import com.slim.kreadevis_backend.service.PdfService;
 import com.slim.kreadevis_backend.service.QuoteItemService;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +24,7 @@ public class QuoteController {
 
     private final QuoteService quoteService;
     private final QuoteItemService quoteItemService;
+    private final PdfService pdfService;
 
     @GetMapping("/api/quotes")
     public ResponseEntity<List<QuoteResponse>> getAll(
@@ -85,5 +89,23 @@ public class QuoteController {
     public ResponseEntity<Void> deleteItem(@PathVariable Long id, @PathVariable Long itemId) {
         quoteItemService.deleteItem(id, itemId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/quotes/{id}/pdf")
+    public ResponseEntity<byte[]> getQuotePdf(@PathVariable Long id) {
+        byte[] pdf = pdfService.generateQuotePdf(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"quote-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/api/quotes/{id}/invoice/pdf")
+    public ResponseEntity<byte[]> getInvoicePdf(@PathVariable Long id) {
+        byte[] pdf = pdfService.generateInvoicePdf(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"invoice-" + id + ".pdf\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 }
