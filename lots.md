@@ -27,7 +27,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 5   | feat/lot-5-crud             | ✅ terminé  |
 | 6   | feat/lot-6-quote            | ✅ terminé  |
 | 7   | feat/lot-7-pdf              | ✅ terminé  |
-| 8   | feat/lot-8-csv              | ⬜ à faire  |
+| 8   | feat/lot-8-csv              | ✅ terminé  |
 | 9   | feat/lot-9-tests            | ⬜ à faire  |
 | 10  | feat/lot-10-email-reminders | ⬜ à faire  |
 
@@ -147,32 +147,19 @@ Réalisé :
 
 ---
 
-## LOT 8 — Import CSV ⬜
+## LOT 8 — Import CSV ✅
 
-**Branche :** `feat/lot-8-csv`
-**Commit cible :** `feat(8): implement CSV product import`
+**Commit :** `feat(8): implement CSV product import`
 
-### Objectif
-Permettre l'import de produits en masse via un fichier CSV (migration du `CsvHelper` / `CsvService` legacy).
-
-### Format CSV attendu
-```
-label,description,stockQuantity,unitPrice,vatRate,referenceCode
-```
-
-### Fichiers à créer
-```
-service/
-  CsvImportService.java
-  impl/CsvImportServiceImpl.java   ← Apache Commons CSV
-controller/
-  ProductController.java           ← ajouter POST /api/products/import (multipart)
-```
-
-### Critères de validation
-- POST `/api/products/import` avec un fichier CSV → produits créés en base
-- Lignes invalides (champs manquants) → retournées dans la réponse avec leurs erreurs
-- `referenceCode` dupliqué → skippé avec message d'avertissement
+Réalisé :
+- `CsvImportService` / `CsvImportServiceImpl` : import via Apache Commons CSV 1.14.0
+- Format CSV : `label,description,stockQuantity,unitPrice,vatRate,referenceCode`
+- `CsvImportResult` DTO : `importedCount`, `imported`, `errors` (numéro de ligne + message), `warnings`
+- Lignes invalides (label vide, champs non-numériques) → collectées dans `errors` sans interrompre l'import
+- `referenceCode` existant → skippé avec message dans `warnings`
+- `POST /api/products/import` (multipart) ajouté dans `ProductController`
+- `existsByReferenceCodeAndActiveTrue` ajouté dans `ProductRepository`
+- 9 tests unitaires `CsvImportServiceImplTest`
 
 ---
 
@@ -320,3 +307,221 @@ POST /api/admin/reminders/trigger  ← ROLE_ADMIN — force l'exécution immédi
 - Aucun mail envoyé si `app.email.enabled=false`
 - Le mail contient nom client, téléphone, email, référence devis, date, montant
 - Aucune clé Mailjet présente dans le repo (`git grep` à blanc)
+
+## LOT 11 — Envoi automatique du devis au client ⬜
+
+**Branche :** `feat/lot-11-quote-auto-send`
+**Commit cible :** `feat(11): implement automatic quote sending to client with delayed scheduler`
+
+### Objectif
+
+Envoyer automatiquement le devis (PDF en pièce jointe) par mail au client après finalisation, avec un délai de réflexion configurable (défaut 24h) pendant lequel le créateur peut annuler. Un batch tourne plusieurs fois par jour dans une plage horaire ouvrée et envoie les devis dont le délai est écoulé. En cas d'échec d'envoi, le créateur est notifié par mail.
+
+### Prérequis
+
+- **LOT 7 (PDF) terminé** → `PdfService.generateQuotePdf(quoteId)` disponible pour produire le byte[] à attacher
+- **LOT 10 (relances email) terminé** → réutilisation de `EmailService`, `MailjetEmailServiceImpl`, `MailjetClientConfig`, `EmailProperties` (et `Quote.createdBy` peuplé via `SecurityContext`)
+
+L'ordre forcé est donc : 7 → 10 → 11.
+
+### Modèle de données
+
+#### Enum `EmailSendStatus` (nouveau)
+```java
+public enum EmailSendStatus {
+    NOT_APPLICABLE,   // pas d'email client renseigné à la finalisation
+    PENDING,          // en attente du batch (ou en attente d'un retry)
+    SENT,             // envoyé avec succès
+    FAILED,           // échec après épuisement des retries
+    CANCELLED         // créateur a annulé (ou repassage en DRAFT)
+}
+```
+
+#### Modifications entité `Quote`
+```java
+@Enumerated(EnumType.STRING)
+@Column(nullable = false)
+private EmailSendStatus emailStatus = EmailSendStatus.NOT_APPLICABLE;
+
+private Instant scheduledSendAt;     // null si pas planifié
+private Instant emailSentAt;          // null tant que pas envoyé
+private Instant emailLastAttemptAt;   // dernier essai (succès ou échec)
+private String emailFailureReason;    // message court de la dernière erreur
+
+@Column(nullable = false)
+private Integer emailRetryCount = 0;
+```
+
+Migration Flyway / script JPA : à ajouter en `V<n>__add_quote_email_send_fields.sql` selon la stratégie en place dans le projet.
+
+### Modifications service existant
+
+#### `QuoteServiceImpl.finalize(Long quoteId)` (modifié)
+À l'appel de finalisation existante (LOT 6), enchaîner :
+1. `status = FINALIZED` (déjà fait)
+2. Si `client.email` non nul et non vide :
+   - `emailStatus = PENDING`
+   - `scheduledSendAt = now() + app.email.quote-send.review-delay-hours` (en heures)
+3. Sinon :
+   - `emailStatus = NOT_APPLICABLE`
+   - `scheduledSendAt = null`
+
+L'absence d'email **ne bloque pas** la finalisation : le devis est toujours téléchargeable depuis l'app.
+
+### Dépendances
+
+Aucune nouvelle dépendance Maven : tout le nécessaire est déjà introduit par LOT 7 (OpenPDF), LOT 10 (Thymeleaf, RestClient), et LOT 6 (JPA, Scheduling via `@EnableScheduling` activé en LOT 10).
+
+### Config `application.yaml` (additions sous `app.email`)
+```yaml
+app:
+  email:
+    # … contenu existant LOT 10 (enabled, mailjet, sender, reminder) …
+    quote-send:
+      enabled: true
+      review-delay-hours: 24
+      cron: "0 0 9,12,15,18 * * MON-SAT"
+      send-window:
+        start: "09:00"
+        end: "18:00"
+      retry:
+        max-attempts: 3
+        backoff-minutes: 15
+      template: quote-to-client
+      failure-template: quote-send-failure
+```
+
+Le toggle `app.email.quote-send.enabled` est indépendant de `app.email.enabled` (kill switch global) et de `app.email.reminder.enabled` (LOT 10). Chacun désactive uniquement sa feature.
+
+### Fichiers à créer
+
+```
+config/
+  QuoteSendProperties.java                ← @ConfigurationProperties("app.email.quote-send")
+service/
+  QuoteEmailService.java                  ← interface
+  impl/QuoteEmailServiceImpl.java         ← orchestration : sélection + envoi + retry + notif échec
+scheduler/
+  QuoteSendScheduler.java                 ← @Scheduled(cron = "${app.email.quote-send.cron}")
+resources/templates/email/
+  quote-to-client.html                    ← template Thymeleaf (mail vers client)
+  quote-send-failure.html                 ← template Thymeleaf (mail vers créateur en cas d'échec)
+```
+
+### Repository
+
+Ajouter dans `QuoteRepository` :
+```java
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("""
+    SELECT q FROM Quote q
+    WHERE q.emailStatus = 'PENDING'
+      AND q.scheduledSendAt <= :now
+      AND q.status = 'FINALIZED'
+""")
+List<Quote> findReadyToSend(@Param("now") Instant now);
+```
+
+Le verrou pessimiste protège contre les doubles envois en cas d'exécutions concurrentes du scheduler (relance manuelle pendant un cron, par exemple).
+
+### Logique `QuoteSendScheduler`
+
+1. Lecture des propriétés `send-window` ; si `now()` est hors fenêtre → log debug et return.
+2. Vérifier `app.email.enabled` ET `app.email.quote-send.enabled` ; sinon return.
+3. Appeler `quoteEmailService.processPendingSends()`.
+
+### Logique `QuoteEmailServiceImpl.processPendingSends()`
+
+Dans une transaction :
+1. `quotes = repository.findReadyToSend(now)`
+2. Pour chaque devis :
+   - Générer le PDF via `pdfService.generateQuotePdf(quote.id)`
+   - Construire `EmailMessage` à partir du template `quote-to-client` (variables : `quote`, `client`, `company`)
+   - Appeler `emailService.sendWithAttachment(emailMessage, pdfBytes, "devis-{ref}.pdf")` (à ajouter dans `EmailService` du LOT 10 si pas déjà présent)
+   - Si succès : `emailStatus = SENT`, `emailSentAt = now()`, `emailLastAttemptAt = now()`, `scheduledSendAt = null`
+   - Si échec :
+     - `emailRetryCount++`, `emailLastAttemptAt = now()`, `emailFailureReason = e.getMessage()` (tronqué à 500 chars)
+     - Si `emailRetryCount < max-attempts` : `scheduledSendAt = now() + backoff-minutes`, `emailStatus` reste `PENDING`
+     - Sinon : `emailStatus = FAILED`, `scheduledSendAt = null`, puis tenter d'envoyer la notif d'échec au créateur (template `quote-send-failure`) — **1 seul essai**, échec silencieux (logué uniquement)
+
+### Templates Thymeleaf
+
+#### `quote-to-client.html`
+Variables : `quote.referenceCode`, `quote.date`, `quote.totalAmount`, `client.name`, `company.name`, `company.email`, `company.phone`.
+Contenu minimal : salutation, mention du devis joint en PDF, validité éventuelle, signature avec coordonnées de l'entreprise.
+
+#### `quote-send-failure.html`
+Variables : `quote.referenceCode`, `client.name`, `client.email`, `client.phoneNumber` (si dispo), `failureReason`, `retryCount`, `quoteUrl` (lien direct vers le devis dans l'app, base à mettre en config).
+Contenu : alerte d'échec, raison technique, coordonnées du client pour relance manuelle, lien vers le devis.
+
+### Endpoints
+
+#### Annulation manuelle de l'envoi programmé
+```
+POST /api/quotes/{id}/cancel-send
+```
+- Requiert auth (utilisateur connecté)
+- 200 si le devis était `PENDING` → passage à `CANCELLED`, `scheduledSendAt = null`
+- 409 Conflict si le devis n'est pas dans un état annulable (déjà `SENT`, `FAILED`, `NOT_APPLICABLE`)
+- 404 si le devis n'existe pas
+
+#### Forçage manuel de l'envoi (sans attendre le cron)
+```
+POST /api/quotes/{id}/send-now
+```
+- Requiert auth
+- 200 si le devis est `PENDING` ou `FAILED` → déclenchement immédiat (passe par la même logique que le scheduler, mais sur ce seul devis)
+- 409 Conflict si état non envoyable (déjà `SENT`, `CANCELLED`, `NOT_APPLICABLE`)
+
+#### Repassage en DRAFT (existant en LOT 6, à patcher)
+Si l'endpoint de revert/édition repasse un devis `FINALIZED` en `DRAFT`, alors :
+- `emailStatus = CANCELLED` (si était `PENDING`) ou conservé (si `SENT` ou `FAILED`)
+- `scheduledSendAt = null`
+
+### Sécurité
+
+- Aucune nouvelle clé secrète à introduire : on réutilise `MAILJET_API_KEY` et `MAILJET_API_SECRET` du LOT 10
+- Validation stricte du contenu utilisateur dans les templates : autoescaping Thymeleaf actif → XSS bloqué nativement
+- Pas de log de l'API key (déjà la règle du LOT 10)
+- Le PDF est généré en mémoire (byte[]), pas écrit sur disque, donc pas de fuite par chemin temp accessible
+- Le mail au client est envoyé en `Reply-To: {company.email}` pour que les réponses arrivent à l'entreprise et non au sender Mailjet
+
+### Tests à inclure dans le lot (règle transversale)
+
+```
+test/
+  service/
+    QuoteEmailServiceImplTest.java
+      - send happy path → status SENT
+      - send échec transitoire → retry incrémenté, status PENDING, scheduledSendAt repoussé
+      - send échec après max-attempts → status FAILED + notif créateur tentée
+      - send hors fenêtre → no-op
+      - send avec quote-send.enabled=false → no-op
+      - quote sans email client → exclu de la sélection
+  scheduler/
+    QuoteSendSchedulerTest.java
+      - intégration : cron déclenche bien processPendingSends
+  controller/
+    QuoteControllerTest.java (ajouts)
+      - cancel-send : 200 si PENDING, 409 sinon
+      - send-now : 200 si PENDING ou FAILED, 409 sinon
+  repository/
+    QuoteRepositoryTest.java (ajout)
+      - findReadyToSend filtre correctement (status, scheduledSendAt, emailStatus)
+```
+
+L'envoi réel Mailjet est mocké (`@MockBean EmailService`) — pas d'appel HTTP en test. La couverture du chemin Mailjet réel est assurée par les tests du LOT 10.
+
+### Critères de validation
+
+- `./mvnw verify` passe vert
+- À la finalisation d'un devis avec email client : `emailStatus = PENDING`, `scheduledSendAt = finalizedAt + 24h`
+- À la finalisation d'un devis sans email client : `emailStatus = NOT_APPLICABLE`, PDF toujours téléchargeable
+- Le scheduler tourne à la fréquence configurée et n'envoie pas hors `send-window`
+- L'appel à `POST /api/quotes/{id}/cancel-send` annule effectivement l'envoi programmé
+- L'appel à `POST /api/quotes/{id}/send-now` déclenche immédiatement
+- Trois échecs consécutifs simulés font basculer le devis en `FAILED` et déclenchent un mail au créateur avec coordonnées client
+- Le mail au client contient : référence devis, PDF joint, coordonnées entreprise en Reply-To
+- Repasser un devis `FINALIZED` en `DRAFT` annule l'envoi programmé
+- Aucune clé Mailjet présente dans le repo (`git grep -i mailjet` à blanc côté secrets)
+- Toggles `app.email.enabled = false` ET `app.email.quote-send.enabled = false` désactivent chacun la feature indépendamment

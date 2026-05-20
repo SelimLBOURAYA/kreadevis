@@ -11,4 +11,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findAllByActiveTrue();
 
     Optional<Product> findByIdAndActiveTrue(Long id);
+
+    boolean existsByReferenceCodeAndActiveTrue(String referenceCode);
 }
