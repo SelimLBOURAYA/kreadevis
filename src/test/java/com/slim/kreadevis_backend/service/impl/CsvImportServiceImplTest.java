@@ -1,12 +1,13 @@
 package com.slim.kreadevis_backend.service.impl;
 
+import com.slim.kreadevis_backend.config.CsvImportColumns;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult;
 import com.slim.kreadevis_backend.entity.Product;
 import com.slim.kreadevis_backend.mapper.ProductMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -23,8 +24,14 @@ class CsvImportServiceImplTest {
     @Mock
     private ProductMapper productMapper;
 
-    @InjectMocks
     private CsvImportServiceImpl csvImportService;
+
+    @BeforeEach
+    void setUp() {
+        CsvImportColumns defaultColumns = new CsvImportColumns(
+                "label", "description", "stockQuantity", "unitPrice", "vatRate", "referenceCode");
+        csvImportService = new CsvImportServiceImpl(productRepository, productMapper, defaultColumns);
+    }
 
     @Test
     void importProducts_importsValidRows() {
