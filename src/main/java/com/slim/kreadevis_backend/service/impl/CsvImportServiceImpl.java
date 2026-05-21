@@ -39,6 +39,20 @@ public class CsvImportServiceImpl implements CsvImportService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
 
+    private record ProductRow(
+            String label,
+            String description,
+            Long stockQuantity,
+            float unitPrice,
+            float vatRate,
+            String referenceCode
+    ) {}
+
+    private sealed interface ParseResult {
+        record Ok(ProductRow row) implements ParseResult {}
+        record Err(RowError error) implements ParseResult {}
+    }
+
     @Override
     @Transactional
     public CsvImportResult importProducts(MultipartFile file) {
@@ -66,61 +80,72 @@ public class CsvImportServiceImpl implements CsvImportService {
                                List<ProductResponse> imported,
                                List<RowError> errors,
                                List<String> warnings) {
+        switch (parseRow(record, lineNumber)) {
+            case ParseResult.Err(RowError err) -> errors.add(err);
+            case ParseResult.Ok(ProductRow row) -> persistIfNew(row, lineNumber, imported, warnings);
+        }
+    }
+
+    private ParseResult parseRow(CSVRecord record, int lineNumber) {
         String label = record.get("label");
-        if (label == null || label.isBlank()) {
-            errors.add(new RowError(lineNumber, "Missing required field: label"));
-            return;
+        if (label.isBlank()) {
+            return new ParseResult.Err(new RowError(lineNumber, "Missing required field: label"));
         }
 
         Long stockQuantity;
         try {
             stockQuantity = Long.parseLong(record.get("stockQuantity"));
         } catch (NumberFormatException e) {
-            errors.add(new RowError(lineNumber, "Invalid stockQuantity: " + record.get("stockQuantity")));
-            return;
+            return new ParseResult.Err(new RowError(lineNumber, "Invalid stockQuantity: " + record.get("stockQuantity")));
         }
 
         float unitPrice;
         try {
             unitPrice = Float.parseFloat(record.get("unitPrice"));
         } catch (NumberFormatException e) {
-            errors.add(new RowError(lineNumber, "Invalid unitPrice: " + record.get("unitPrice")));
-            return;
+            return new ParseResult.Err(new RowError(lineNumber, "Invalid unitPrice: " + record.get("unitPrice")));
         }
 
         float vatRate;
         try {
             vatRate = Float.parseFloat(record.get("vatRate"));
         } catch (NumberFormatException e) {
-            errors.add(new RowError(lineNumber, "Invalid vatRate: " + record.get("vatRate")));
+            return new ParseResult.Err(new RowError(lineNumber, "Invalid vatRate: " + record.get("vatRate")));
+        }
+
+        return new ParseResult.Ok(new ProductRow(
+                label,
+                blankToNull(record.get("description")),
+                stockQuantity,
+                unitPrice,
+                vatRate,
+                blankToNull(record.get("referenceCode"))
+        ));
+    }
+
+    private void persistIfNew(ProductRow row, int lineNumber,
+                              List<ProductResponse> imported, List<String> warnings) {
+        if (row.referenceCode() != null
+                && productRepository.existsByReferenceCodeAndActiveTrue(row.referenceCode())) {
+            warnings.add("Line " + lineNumber + ": referenceCode '" + row.referenceCode() + "' already exists, skipped");
             return;
         }
-
-        String referenceCode = record.get("referenceCode");
-        if (referenceCode != null && !referenceCode.isBlank()) {
-            if (productRepository.existsByReferenceCodeAndActiveTrue(referenceCode)) {
-                warnings.add("Line " + lineNumber + ": referenceCode '" + referenceCode + "' already exists, skipped");
-                return;
-            }
-        } else {
-            referenceCode = null;
-        }
-
-        String description = record.get("description");
-        if (description != null && description.isBlank()) {
-            description = null;
-        }
-
-        Product product = Product.builder()
-                .label(label)
-                .description(description)
-                .stockQuantity(stockQuantity)
-                .unitPrice(unitPrice)
-                .vatRate(vatRate)
-                .referenceCode(referenceCode)
-                .build();
-
-        Product saved = productRepository.save(product);
+        Product saved = productRepository.save(toEntity(row));
         imported.add(productMapper.toResponse(saved));
+    }
+
+    private Product toEntity(ProductRow row) {
+        return Product.builder()
+                .label(row.label())
+                .description(row.description())
+                .stockQuantity(row.stockQuantity())
+                .unitPrice(row.unitPrice())
+                .vatRate(row.vatRate())
+                .referenceCode(row.referenceCode())
+                .build();
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s;
     }
 }
