@@ -12,5 +12,5 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByIdAndActiveTrue(Long id);
 
-    boolean existsByReferenceCodeAndActiveTrue(String referenceCode);
+    Optional<Product> findByReferenceCodeAndActiveTrue(String referenceCode);
 }

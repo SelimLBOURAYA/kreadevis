@@ -73,7 +73,7 @@ public class CsvImportServiceImpl implements CsvImportService {
             Iterable<CSVRecord> records = csvFormat.parse(reader);
             for (CSVRecord record : records) {
                 int lineNumber = (int) record.getRecordNumber() + 1;
-                processRecord(record, lineNumber, imported, errors, warnings);
+                processRecord(record, lineNumber, imported, errors);
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to read CSV file: " + e.getMessage(), e);
@@ -87,11 +87,10 @@ public class CsvImportServiceImpl implements CsvImportService {
 
     private void processRecord(CSVRecord record, int lineNumber,
                                List<ProductResponse> imported,
-                               List<RowError> errors,
-                               List<String> warnings) {
+                               List<RowError> errors) {
         switch (parseRow(record, lineNumber)) {
             case ParseResult.Err(RowError err) -> errors.add(err);
-            case ParseResult.Ok(ProductRow row) -> persistIfNew(row, lineNumber, imported, warnings);
+            case ParseResult.Ok(ProductRow row) -> persistOrUpdate(row, imported);
         }
     }
 
@@ -132,14 +131,23 @@ public class CsvImportServiceImpl implements CsvImportService {
         ));
     }
 
-    private void persistIfNew(ProductRow row, int lineNumber,
-                              List<ProductResponse> imported, List<String> warnings) {
-        if (row.referenceCode() != null
-                && productRepository.existsByReferenceCodeAndActiveTrue(row.referenceCode())) {
-            warnings.add("Line " + lineNumber + ": referenceCode '" + row.referenceCode() + "' already exists, skipped");
-            return;
+    private void persistOrUpdate(ProductRow row, List<ProductResponse> imported) {
+        Product product;
+        if (row.referenceCode() != null) {
+            product = productRepository.findByReferenceCodeAndActiveTrue(row.referenceCode())
+                    .map(existing -> {
+                        existing.setLabel(row.label());
+                        existing.setDescription(row.description());
+                        existing.setStockQuantity(row.stockQuantity());
+                        existing.setUnitPrice(row.unitPrice());
+                        existing.setVatRate(row.vatRate());
+                        return existing;
+                    })
+                    .orElseGet(() -> toEntity(row));
+        } else {
+            product = toEntity(row);
         }
-        Product saved = productRepository.save(toEntity(row));
+        Product saved = productRepository.save(product);
         imported.add(productMapper.toResponse(saved));
     }
 
