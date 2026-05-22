@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "quote_items")
 @Getter @Setter
@@ -22,10 +24,10 @@ public class QuoteItem {
     private Long quantity;
 
     @Column(name = "unit_price")
-    private float unitPrice;
+    private BigDecimal unitPrice;
 
     @Column(name = "total_price")
-    private float totalPrice;
+    private BigDecimal totalPrice;
 
     @ManyToOne
     @JsonIgnoreProperties("items")

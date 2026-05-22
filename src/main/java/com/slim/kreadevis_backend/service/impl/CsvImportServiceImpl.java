@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +53,8 @@ public class CsvImportServiceImpl implements CsvImportService {
             String label,
             String description,
             Long stockQuantity,
-            float unitPrice,
-            float vatRate,
+            BigDecimal unitPrice,
+            BigDecimal vatRate,
             String referenceCode
     ) {}
 
@@ -107,16 +108,16 @@ public class CsvImportServiceImpl implements CsvImportService {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid stockQuantity: " + record.get(columns.stockQuantity())));
         }
 
-        float unitPrice;
+        BigDecimal unitPrice;
         try {
-            unitPrice = Float.parseFloat(record.get(columns.unitPrice()));
+            unitPrice = new BigDecimal(record.get(columns.unitPrice()));
         } catch (NumberFormatException e) {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid unitPrice: " + record.get(columns.unitPrice())));
         }
 
-        float vatRate;
+        BigDecimal vatRate;
         try {
-            vatRate = Float.parseFloat(record.get(columns.vatRate()));
+            vatRate = new BigDecimal(record.get(columns.vatRate()));
         } catch (NumberFormatException e) {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid vatRate: " + record.get(columns.vatRate())));
         }

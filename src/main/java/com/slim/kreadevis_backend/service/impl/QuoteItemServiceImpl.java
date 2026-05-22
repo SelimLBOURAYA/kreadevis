@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 @Service
 @RequiredArgsConstructor
 public class QuoteItemServiceImpl implements QuoteItemService {
@@ -37,7 +39,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
                 .product(product)
                 .quantity(request.quantity())
                 .unitPrice(product.getUnitPrice())
-                .totalPrice(product.getUnitPrice() * request.quantity())
+                .totalPrice(product.getUnitPrice().multiply(BigDecimal.valueOf(request.quantity())))
                 .build();
 
         return quoteMapper.toItemResponse(quoteItemRepository.save(item));
@@ -54,7 +56,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         item.setProduct(product);
         item.setQuantity(request.quantity());
         item.setUnitPrice(product.getUnitPrice());
-        item.setTotalPrice(product.getUnitPrice() * request.quantity());
+        item.setTotalPrice(product.getUnitPrice().multiply(BigDecimal.valueOf(request.quantity())));
 
         return quoteMapper.toItemResponse(quoteItemRepository.save(item));
     }

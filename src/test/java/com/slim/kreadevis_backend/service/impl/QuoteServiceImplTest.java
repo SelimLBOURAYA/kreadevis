@@ -24,6 +24,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -303,6 +304,6 @@ class QuoteServiceImplTest {
     }
 
     private QuoteResponse dummyResponse() {
-        return new QuoteResponse(1L, "REF", LocalDate.now(), 0f, QuoteStatus.DRAFT, null, List.of());
+        return new QuoteResponse(1L, "REF", LocalDate.now(), BigDecimal.ZERO, QuoteStatus.DRAFT, null, List.of());
     }
 }

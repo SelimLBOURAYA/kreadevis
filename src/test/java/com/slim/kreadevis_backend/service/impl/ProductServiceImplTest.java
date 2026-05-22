@@ -14,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -167,14 +168,14 @@ class ProductServiceImplTest {
     }
 
     private ProductRequest requestWithoutSupplier() {
-        return new ProductRequest("Widget", "A thing", 100L, 9.99f, 0.20f, "WID-001", null);
+        return new ProductRequest("Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", null);
     }
 
     private ProductRequest requestWithSupplier() {
-        return new ProductRequest("Widget", "A thing", 100L, 9.99f, 0.20f, "WID-001", 5L);
+        return new ProductRequest("Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", 5L);
     }
 
     private ProductResponse dummyResponse() {
-        return new ProductResponse(1L, "Widget", "A thing", 100L, 9.99f, 0.20f, "WID-001", null);
+        return new ProductResponse(1L, "Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", null);
     }
 }
