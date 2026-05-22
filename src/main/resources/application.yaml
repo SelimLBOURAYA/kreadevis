@@ -32,6 +32,15 @@ app:
     facture-dir: ${DOC_FACTURE_DIR:/tmp/kreadevis/factures}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+  csv:
+    import:
+      columns:
+        label: label
+        description: description
+        stock-quantity: stockQuantity
+        unit-price: unitPrice
+        vat-rate: vatRate
+        reference-code: referenceCode
 
 ---
 spring:
