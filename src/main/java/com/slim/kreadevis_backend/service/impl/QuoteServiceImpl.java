@@ -4,6 +4,7 @@ import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
 import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
+import com.slim.kreadevis_backend.entity.QuoteItem;
 import com.slim.kreadevis_backend.entity.QuoteStatus;
 import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
@@ -18,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -129,9 +131,10 @@ public class QuoteServiceImpl implements QuoteService {
         quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
     }
 
-    private float computeTotalPrice(Quote quote) {
+    private BigDecimal computeTotalPrice(Quote quote) {
         return quote.getItems().stream()
-                .reduce(0f, (acc, item) -> acc + item.getTotalPrice(), Float::sum);
+                .map(QuoteItem::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private User getCurrentUser() {

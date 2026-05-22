@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,8 +53,8 @@ public class CsvImportServiceImpl implements CsvImportService {
             String label,
             String description,
             Long stockQuantity,
-            float unitPrice,
-            float vatRate,
+            BigDecimal unitPrice,
+            BigDecimal vatRate,
             String referenceCode
     ) {}
 
@@ -73,7 +74,7 @@ public class CsvImportServiceImpl implements CsvImportService {
             Iterable<CSVRecord> records = csvFormat.parse(reader);
             for (CSVRecord record : records) {
                 int lineNumber = (int) record.getRecordNumber() + 1;
-                processRecord(record, lineNumber, imported, errors, warnings);
+                processRecord(record, lineNumber, imported, errors);
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Failed to read CSV file: " + e.getMessage(), e);
@@ -87,11 +88,10 @@ public class CsvImportServiceImpl implements CsvImportService {
 
     private void processRecord(CSVRecord record, int lineNumber,
                                List<ProductResponse> imported,
-                               List<RowError> errors,
-                               List<String> warnings) {
+                               List<RowError> errors) {
         switch (parseRow(record, lineNumber)) {
             case ParseResult.Err(RowError err) -> errors.add(err);
-            case ParseResult.Ok(ProductRow row) -> persistIfNew(row, lineNumber, imported, warnings);
+            case ParseResult.Ok(ProductRow row) -> persistOrUpdate(row, imported);
         }
     }
 
@@ -108,16 +108,16 @@ public class CsvImportServiceImpl implements CsvImportService {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid stockQuantity: " + record.get(columns.stockQuantity())));
         }
 
-        float unitPrice;
+        BigDecimal unitPrice;
         try {
-            unitPrice = Float.parseFloat(record.get(columns.unitPrice()));
+            unitPrice = new BigDecimal(record.get(columns.unitPrice()));
         } catch (NumberFormatException e) {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid unitPrice: " + record.get(columns.unitPrice())));
         }
 
-        float vatRate;
+        BigDecimal vatRate;
         try {
-            vatRate = Float.parseFloat(record.get(columns.vatRate()));
+            vatRate = new BigDecimal(record.get(columns.vatRate()));
         } catch (NumberFormatException e) {
             return new ParseResult.Err(new RowError(lineNumber, "Invalid vatRate: " + record.get(columns.vatRate())));
         }
@@ -132,14 +132,23 @@ public class CsvImportServiceImpl implements CsvImportService {
         ));
     }
 
-    private void persistIfNew(ProductRow row, int lineNumber,
-                              List<ProductResponse> imported, List<String> warnings) {
-        if (row.referenceCode() != null
-                && productRepository.existsByReferenceCodeAndActiveTrue(row.referenceCode())) {
-            warnings.add("Line " + lineNumber + ": referenceCode '" + row.referenceCode() + "' already exists, skipped");
-            return;
+    private void persistOrUpdate(ProductRow row, List<ProductResponse> imported) {
+        Product product;
+        if (row.referenceCode() != null) {
+            product = productRepository.findByReferenceCodeAndActiveTrue(row.referenceCode())
+                    .map(existing -> {
+                        existing.setLabel(row.label());
+                        existing.setDescription(row.description());
+                        existing.setStockQuantity(row.stockQuantity());
+                        existing.setUnitPrice(row.unitPrice());
+                        existing.setVatRate(row.vatRate());
+                        return existing;
+                    })
+                    .orElseGet(() -> toEntity(row));
+        } else {
+            product = toEntity(row);
         }
-        Product saved = productRepository.save(toEntity(row));
+        Product saved = productRepository.save(product);
         imported.add(productMapper.toResponse(saved));
     }
 

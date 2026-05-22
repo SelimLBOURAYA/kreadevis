@@ -3,6 +3,8 @@ package com.slim.kreadevis_backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "products")
 @Getter @Setter
@@ -27,10 +29,10 @@ public class Product {
     private Long stockQuantity;
 
     @Column(name = "unit_price")
-    private float unitPrice;
+    private BigDecimal unitPrice;
 
     @Column(name = "vat_rate")
-    private float vatRate;
+    private BigDecimal vatRate;
 
     @Column(unique = true, name = "reference_code")
     private String referenceCode;

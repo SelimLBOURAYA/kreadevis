@@ -13,6 +13,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -142,15 +143,15 @@ class PdfServiceImplTest {
         Product product = Product.builder()
                 .id(1L)
                 .label("Robinet mitigeur")
-                .unitPrice(85.00f)
-                .vatRate(20f)
+                .unitPrice(new BigDecimal("85.00"))
+                .vatRate(new BigDecimal("20"))
                 .build();
 
         QuoteItem item = QuoteItem.builder()
                 .id(1L)
                 .quantity(2L)
-                .unitPrice(85.00f)
-                .totalPrice(170.00f)
+                .unitPrice(new BigDecimal("85.00"))
+                .totalPrice(new BigDecimal("170.00"))
                 .product(product)
                 .active(true)
                 .build();
@@ -160,7 +161,7 @@ class PdfServiceImplTest {
                 .referenceCode("200526-1-001")
                 .date(LocalDate.of(2026, 5, 20))
                 .status(QuoteStatus.FINALIZED)
-                .totalPrice(170.00f)
+                .totalPrice(new BigDecimal("170.00"))
                 .client(client)
                 .items(new java.util.ArrayList<>(List.of(item)))
                 .active(true)

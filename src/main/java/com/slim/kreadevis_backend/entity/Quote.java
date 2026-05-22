@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,7 @@ public class Quote {
     private Long id;
 
     @Column(name = "total_price")
-    private float totalPrice;
+    private BigDecimal totalPrice;
 
     @Column
     private LocalDate date = LocalDate.now();

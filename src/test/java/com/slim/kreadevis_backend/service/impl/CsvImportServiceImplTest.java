@@ -12,8 +12,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +43,7 @@ class CsvImportServiceImplTest {
                      "Tuyau,Cuivre,50,12.5,20.0,REF-002\n";
         MockMultipartFile file = multipartFile(csv);
 
-        when(productRepository.existsByReferenceCodeAndActiveTrue(anyString())).thenReturn(false);
+        when(productRepository.findByReferenceCodeAndActiveTrue(anyString())).thenReturn(Optional.empty());
         when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(productMapper.toResponse(any())).thenAnswer(inv -> null);
 
@@ -103,19 +106,23 @@ class CsvImportServiceImplTest {
     }
 
     @Test
-    void importProducts_skipsRowWithDuplicateReferenceCode() {
+    void importProducts_updatesExistingProduct_whenReferenceCodeExists() {
         String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
-                     "Robinet,Desc,5,85.0,20.0,DUPLICATE\n";
+                     "Updated Name,New Desc,10,99.0,20.0,EXISTING\n";
         MockMultipartFile file = multipartFile(csv);
 
-        when(productRepository.existsByReferenceCodeAndActiveTrue("DUPLICATE")).thenReturn(true);
+        Product existing = new Product();
+        when(productRepository.findByReferenceCodeAndActiveTrue("EXISTING")).thenReturn(Optional.of(existing));
+        when(productRepository.save(existing)).thenReturn(existing);
+        when(productMapper.toResponse(existing)).thenAnswer(inv -> null);
 
         CsvImportResult result = csvImportService.importProducts(file);
 
-        assertThat(result.importedCount()).isEqualTo(0);
-        assertThat(result.warnings()).hasSize(1);
-        assertThat(result.warnings().get(0)).contains("DUPLICATE");
-        verify(productRepository, never()).save(any());
+        assertThat(result.importedCount()).isEqualTo(1);
+        assertThat(result.warnings()).isEmpty();
+        verify(productRepository).save(existing);
+        assertThat(existing.getLabel()).isEqualTo("Updated Name");
+        assertThat(existing.getDescription()).isEqualTo("New Desc");
     }
 
     @Test
@@ -132,7 +139,7 @@ class CsvImportServiceImplTest {
         assertThat(result.importedCount()).isEqualTo(1);
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
-        verify(productRepository, never()).existsByReferenceCodeAndActiveTrue(any());
+        verify(productRepository, never()).findByReferenceCodeAndActiveTrue(any());
     }
 
     @Test
@@ -155,7 +162,7 @@ class CsvImportServiceImplTest {
                      "Another Product,Desc,3,30.0,10.0,\n";
         MockMultipartFile file = multipartFile(csv);
 
-        when(productRepository.existsByReferenceCodeAndActiveTrue("REF-OK")).thenReturn(false);
+        when(productRepository.findByReferenceCodeAndActiveTrue("REF-OK")).thenReturn(Optional.empty());
         when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(productMapper.toResponse(any())).thenAnswer(inv -> null);
 
