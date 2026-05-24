@@ -103,7 +103,9 @@ class QuoteControllerTest {
     @Test
     @WithMockUser
     void finalize_shouldReturn200() throws Exception {
-        QuoteResponse finalized = new QuoteResponse(1L, "REF-001", LocalDate.now(), BigDecimal.TEN, QuoteStatus.FINALIZED, null, List.of());
+        QuoteResponse finalized = new QuoteResponse(1L, "REF-001", LocalDate.now(),
+                BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TEN,
+                QuoteStatus.FINALIZED, null, List.of());
         when(quoteService.finalize(1L)).thenReturn(finalized);
 
         mockMvc.perform(post("/api/quotes/1/finalize"))
@@ -113,11 +115,11 @@ class QuoteControllerTest {
 
     @Test
     @WithMockUser
-    void cancel_shouldReturn500_whenAlreadyFinalized() throws Exception {
+    void cancel_shouldReturn409_whenAlreadyFinalized() throws Exception {
         when(quoteService.cancel(1L)).thenThrow(new IllegalStateException("Cannot cancel a finalized quote"));
 
         mockMvc.perform(post("/api/quotes/1/cancel"))
-                .andExpect(status().isInternalServerError())
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Cannot cancel a finalized quote"));
     }
 
@@ -131,6 +133,8 @@ class QuoteControllerTest {
     }
 
     private QuoteResponse dummyResponse() {
-        return new QuoteResponse(1L, "REF-001", LocalDate.now(), BigDecimal.ZERO, QuoteStatus.DRAFT, null, List.of());
+        return new QuoteResponse(1L, "REF-001", LocalDate.now(),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                QuoteStatus.DRAFT, null, List.of());
     }
 }
