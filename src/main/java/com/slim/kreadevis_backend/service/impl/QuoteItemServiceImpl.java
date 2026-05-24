@@ -5,6 +5,7 @@ import com.slim.kreadevis_backend.dto.quote.QuoteItemResponse;
 import com.slim.kreadevis_backend.entity.Product;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.entity.QuoteItem;
+import com.slim.kreadevis_backend.entity.QuoteStatus;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.repository.QuoteItemRepository;
@@ -16,10 +17,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 public class QuoteItemServiceImpl implements QuoteItemService {
+
+    private static final Set<QuoteStatus> LOCKED_STATUSES = Set.of(QuoteStatus.FINALIZED, QuoteStatus.CANCELLED);
 
     private final QuoteRepository quoteRepository;
     private final QuoteItemRepository quoteItemRepository;
@@ -29,8 +33,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     @Override
     @Transactional
     public QuoteItemResponse addItem(Long quoteId, QuoteItemRequest request) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = loadModifiableQuote(quoteId);
         Product product = productRepository.findByIdAndActiveTrue(request.productId())
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
 
@@ -39,15 +42,22 @@ public class QuoteItemServiceImpl implements QuoteItemService {
                 .product(product)
                 .quantity(request.quantity())
                 .unitPrice(product.getUnitPrice())
+                .vatRate(product.getVatRate())
                 .totalPrice(product.getUnitPrice().multiply(BigDecimal.valueOf(request.quantity())))
                 .build();
 
-        return quoteMapper.toItemResponse(quoteItemRepository.save(item));
+        QuoteItem saved = quoteItemRepository.save(item);
+        quote.getItems().add(saved);
+        QuoteTotals.recompute(quote);
+        quoteRepository.save(quote);
+
+        return quoteMapper.toItemResponse(saved);
     }
 
     @Override
     @Transactional
     public QuoteItemResponse updateItem(Long quoteId, Long itemId, QuoteItemRequest request) {
+        Quote quote = loadModifiableQuote(quoteId);
         QuoteItem item = quoteItemRepository.findByIdAndActiveTrue(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
         Product product = productRepository.findByIdAndActiveTrue(request.productId())
@@ -56,17 +66,37 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         item.setProduct(product);
         item.setQuantity(request.quantity());
         item.setUnitPrice(product.getUnitPrice());
+        item.setVatRate(product.getVatRate());
         item.setTotalPrice(product.getUnitPrice().multiply(BigDecimal.valueOf(request.quantity())));
 
-        return quoteMapper.toItemResponse(quoteItemRepository.save(item));
+        QuoteItem saved = quoteItemRepository.save(item);
+        QuoteTotals.recompute(quote);
+        quoteRepository.save(quote);
+
+        return quoteMapper.toItemResponse(saved);
     }
 
     @Override
     @Transactional
     public void deleteItem(Long quoteId, Long itemId) {
+        Quote quote = loadModifiableQuote(quoteId);
         QuoteItem item = quoteItemRepository.findById(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
         item.setActive(false);
         quoteItemRepository.save(item);
+
+        QuoteTotals.recompute(quote);
+        quoteRepository.save(quote);
     }
+
+    private Quote loadModifiableQuote(Long quoteId) {
+        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        if (LOCKED_STATUSES.contains(quote.getStatus())) {
+            throw new IllegalStateException(
+                    "Cannot modify items of a quote with status " + quote.getStatus());
+        }
+        return quote;
+    }
+
 }
