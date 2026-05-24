@@ -9,5 +9,6 @@ public record QuoteItemResponse(
         ProductResponse product,
         Long quantity,
         BigDecimal unitPrice,
+        BigDecimal vatRate,
         BigDecimal totalPrice
 ) {}

@@ -23,8 +23,14 @@ public class Quote {
     @SequenceGenerator(name = "quote_seq_gen", sequenceName = "quote_seq", initialValue = 1, allocationSize = 1)
     private Long id;
 
-    @Column(name = "total_price")
-    private BigDecimal totalPrice;
+    @Column(name = "total_price_ht")
+    private BigDecimal totalPriceHt;
+
+    @Column(name = "total_vat")
+    private BigDecimal totalVat;
+
+    @Column(name = "total_price_ttc")
+    private BigDecimal totalPriceTtc;
 
     @Builder.Default
     @Column

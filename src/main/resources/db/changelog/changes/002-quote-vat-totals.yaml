@@ -1,0 +1,36 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 002-add-vat-rate-to-quote-items
+      author: kreadevis
+      changes:
+        - addColumn:
+            tableName: quote_items
+            columns:
+              - column:
+                  name: vat_rate
+                  type: NUMERIC
+
+  - changeSet:
+      id: 002-rename-total-price-to-total-price-ht
+      author: kreadevis
+      changes:
+        - renameColumn:
+            tableName: quotes
+            oldColumnName: total_price
+            newColumnName: total_price_ht
+            columnDataType: NUMERIC
+
+  - changeSet:
+      id: 002-add-vat-and-ttc-totals-on-quotes
+      author: kreadevis
+      changes:
+        - addColumn:
+            tableName: quotes
+            columns:
+              - column:
+                  name: total_vat
+                  type: NUMERIC
+              - column:
+                  name: total_price_ttc
+                  type: NUMERIC

@@ -26,6 +26,9 @@ public class QuoteItem {
     @Column(name = "unit_price")
     private BigDecimal unitPrice;
 
+    @Column(name = "vat_rate")
+    private BigDecimal vatRate;
+
     @Column(name = "total_price")
     private BigDecimal totalPrice;
 
