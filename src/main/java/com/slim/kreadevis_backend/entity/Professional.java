@@ -14,7 +14,7 @@ public class Professional {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "prof_seq_gen")
-    @SequenceGenerator(name = "prof_seq_gen", sequenceName = "prof_seq", initialValue = 11, allocationSize = 1)
+    @SequenceGenerator(name = "prof_seq_gen", sequenceName = "prof_seq", initialValue = 1, allocationSize = 1)
     private Long id;
 
     @Column(nullable = false)

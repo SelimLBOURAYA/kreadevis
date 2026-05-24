@@ -20,7 +20,7 @@ public class Quote {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "quote_seq_gen")
-    @SequenceGenerator(name = "quote_seq_gen", sequenceName = "quote_seq", initialValue = 101, allocationSize = 1)
+    @SequenceGenerator(name = "quote_seq_gen", sequenceName = "quote_seq", initialValue = 1, allocationSize = 1)
     private Long id;
 
     @Column(name = "total_price")

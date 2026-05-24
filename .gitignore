@@ -1,6 +1,7 @@
 HELP.md
 CLAUDE.md
 lots.md
+security.md
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

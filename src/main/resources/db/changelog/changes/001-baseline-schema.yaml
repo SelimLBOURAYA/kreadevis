@@ -1,0 +1,415 @@
+databaseChangeLog:
+
+  # ── Sequences ────────────────────────────────────────────────────────────────
+  - changeSet:
+      id: 001-sequences
+      author: kreadevis
+      changes:
+        - createSequence:
+            sequenceName: user_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: role_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: address_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: client_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: prof_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: prod_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: quote_seq
+            startValue: 1
+            incrementBy: 1
+        - createSequence:
+            sequenceName: quote_item_seq
+            startValue: 1
+            incrementBy: 1
+
+  # ── Tables without FK dependencies ───────────────────────────────────────────
+  - changeSet:
+      id: 001-table-users
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: login
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_users_login
+              - column:
+                  name: email
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_users_email
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  - changeSet:
+      id: 001-table-roles
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: VARCHAR(20)
+
+  - changeSet:
+      id: 001-table-addresses
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: addresses
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: street_number
+                  type: VARCHAR(255)
+              - column:
+                  name: street
+                  type: VARCHAR(255)
+              - column:
+                  name: postal_code
+                  type: VARCHAR(255)
+              - column:
+                  name: city
+                  type: VARCHAR(255)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  # ── Tables with FK dependencies ───────────────────────────────────────────────
+  - changeSet:
+      id: 001-table-professionals
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: professionals
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: first_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: contact_email
+                  type: VARCHAR(255)
+              - column:
+                  name: street_number
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: street
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: zip_code
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: city
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: company
+                  type: VARCHAR(255)
+              - column:
+                  name: vat
+                  type: VARCHAR(255)
+              - column:
+                  name: siren
+                  type: VARCHAR(255)
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    unique: true
+                    uniqueConstraintName: uq_professionals_user
+                    foreignKeyName: fk_professionals_user
+                    references: users(id)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  - changeSet:
+      id: 001-table-clients
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: clients
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: first_name
+                  type: VARCHAR(255)
+              - column:
+                  name: last_name
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: company
+                  type: VARCHAR(255)
+              - column:
+                  name: siret
+                  type: VARCHAR(255)
+              - column:
+                  name: siren
+                  type: VARCHAR(255)
+              - column:
+                  name: vat_code
+                  type: VARCHAR(255)
+              - column:
+                  name: address_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_clients_address
+                    references: addresses(id)
+              - column:
+                  name: phone
+                  type: VARCHAR(255)
+              - column:
+                  name: email
+                  type: VARCHAR(254)
+                  constraints:
+                    unique: true
+                    uniqueConstraintName: uq_clients_email
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  - changeSet:
+      id: 001-table-products
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: products
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: label
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(255)
+              - column:
+                  name: stock_quantity
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: unit_price
+                  type: NUMERIC
+              - column:
+                  name: vat_rate
+                  type: NUMERIC
+              - column:
+                  name: reference_code
+                  type: VARCHAR(255)
+                  constraints:
+                    unique: true
+                    uniqueConstraintName: uq_products_reference_code
+              - column:
+                  name: supplier_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_products_supplier
+                    references: professionals(id)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  - changeSet:
+      id: 001-table-quotes
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: quotes
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: total_price
+                  type: NUMERIC
+              - column:
+                  name: date
+                  type: DATE
+              - column:
+                  name: reference_code
+                  type: VARCHAR(255)
+              - column:
+                  name: daily_sequence
+                  type: INTEGER
+              - column:
+                  name: status
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: client_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_quotes_client
+                    references: clients(id)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              - column:
+                  name: created_by
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_quotes_created_by
+                    references: users(id)
+
+  - changeSet:
+      id: 001-table-quote-items
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: quote_items
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: quantity
+                  type: BIGINT
+              - column:
+                  name: unit_price
+                  type: NUMERIC
+              - column:
+                  name: total_price
+                  type: NUMERIC
+              - column:
+                  name: product_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_quote_items_product
+                    references: products(id)
+              - column:
+                  name: quote_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_quote_items_quote
+                    references: quotes(id)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+
+  # ── Join tables ───────────────────────────────────────────────────────────────
+  - changeSet:
+      id: 001-table-user-roles
+      author: kreadevis
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_user_roles_user
+                    references: users(id)
+              - column:
+                  name: role_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_user_roles_role
+                    references: roles(id)
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role_id
+            constraintName: pk_user_roles
