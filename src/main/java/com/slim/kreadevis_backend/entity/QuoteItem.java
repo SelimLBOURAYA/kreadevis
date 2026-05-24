@@ -17,7 +17,7 @@ public class QuoteItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "quote_item_seq_gen")
-    @SequenceGenerator(name = "quote_item_seq_gen", sequenceName = "quote_item_seq", initialValue = 10001, allocationSize = 1)
+    @SequenceGenerator(name = "quote_item_seq_gen", sequenceName = "quote_item_seq", initialValue = 1, allocationSize = 1)
     private Long id;
 
     @Column(name = "quantity")

@@ -7,7 +7,7 @@ databaseChangeLog:
       changes:
         - createSequence:
             sequenceName: user_seq
-            startValue: 1002
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: role_seq
@@ -15,27 +15,27 @@ databaseChangeLog:
             incrementBy: 1
         - createSequence:
             sequenceName: address_seq
-            startValue: 200001
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: client_seq
-            startValue: 100001
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: prof_seq
-            startValue: 11
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: prod_seq
-            startValue: 101
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: quote_seq
-            startValue: 101
+            startValue: 1
             incrementBy: 1
         - createSequence:
             sequenceName: quote_item_seq
-            startValue: 10001
+            startValue: 1
             incrementBy: 1
 
   # ── Tables without FK dependencies ───────────────────────────────────────────
