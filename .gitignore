@@ -1,7 +1,6 @@
-HELP.md
-CLAUDE.md
-lots.md
-security.md
+# Personal overrides only — project docs (CLAUDE.md, lots.md, AGENTS.md…) are versioned
+*.local.md
+
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
