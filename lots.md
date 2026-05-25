@@ -106,6 +106,9 @@ Réalisé :
 - `@Data` retiré sur `Client` et `Address` → remplacé par `@Getter @Setter @EqualsAndHashCode(of = "id")`
 - `UserResponse` ne contient jamais `password` (`@JsonIgnore` côté entité + mapper)
 
+Problème connu :
+- `ProfessionalResponse` n'inclut pas les champs d'adresse (`streetNumber`, `street`, `zipCode`, `city`) — seuls `id`, `firstName`, `lastName`, `company`, `phone`, `contactEmail` sont renvoyés. Côté frontend, les champs d'adresse ne peuvent pas être pré-remplis en mode édition. À corriger dans un lot dédié si nécessaire.
+
 ---
 
 ## LOT 5 — Services + Controllers CRUD ✅
