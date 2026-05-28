@@ -25,6 +25,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 3   | feat/lot-3-security            | ✅ terminé  | sécurité (base)    |
 | 4   | feat/lot-4-dto-mappers         | ✅ terminé  | API                |
 | 5   | feat/lot-5-crud                | ✅ terminé  | API                |
+| 5b  | feat/lot-5b-professional-dto   | ⬜ à faire  | API                |
 | 6   | feat/lot-6-quote               | ✅ terminé  | métier             |
 | 7   | feat/lot-7-pdf                 | ✅ terminé  | métier             |
 | 8   | feat/lot-8-csv                 | ✅ terminé  | métier             |
@@ -121,6 +122,86 @@ Réalisé :
 - `UserController` ne touche plus directement le repository → passe par `UserService`
 - Tous les endpoints utilisent les DTOs (`*Request` / `*Response`), pas d'entité en body
 - `@Valid` appliqué sur les `@RequestBody`
+
+---
+
+## LOT 5b — Professional DTO — champs optionnels et adresse en réponse ⬜
+
+**Branche :** `feat/lot-5b-professional-dto`
+**Commit cible :** `feat(5b): make firstName and address fields optional, expose address in ProfessionalResponse`
+
+### Contexte
+
+Deux problèmes identifiés lors de la revue de PR `feat/lot-6-professionals` du frontend :
+
+1. `firstName` est marqué `@NotBlank` dans `ProfessionalRequest` alors qu'il n'est pas pertinent pour un professionnel de type entreprise.
+2. Les champs d'adresse (`streetNumber`, `street`, `zipCode`, `city`) sont obligatoires alors qu'un professionnel peut ne pas avoir d'adresse connue au moment de la création.
+3. `ProfessionalResponse` n'expose pas les champs d'adresse — problème connu noté en LOT 4 — ce qui empêche le front de pré-remplir le formulaire d'édition.
+
+### Périmètre
+
+**1. DTO `ProfessionalRequest`**
+- Retirer `@NotBlank` sur `firstName`, `streetNumber`, `street`, `zipCode`, `city`.
+- Ces cinq champs deviennent `String` nullable (pas d'annotation de validation).
+
+**2. Entité `Professional`**
+- Retirer `nullable = false` sur les colonnes `first_name`, `street_number`, `street`, `zip_code`, `city`.
+- Liquibase changeset correspondant (ALTER COLUMN DROP NOT NULL sur ces cinq colonnes).
+
+**3. `ProfessionalResponse`**
+- Ajouter les champs d'adresse : `streetNumber`, `street`, `zipCode`, `city`.
+- Mettre à jour `ProfessionalMapper` pour les inclure dans la projection.
+
+**4. Mapper `ProfessionalMapper`**
+- Méthode `update` : ne pas écraser un champ nullable existant si la valeur entrante est `null` (utiliser `@Condition` ou `nullValuePropertyMappingStrategy = IGNORE`).
+
+### Fichiers à modifier
+```
+dto/professional/ProfessionalRequest.java   ← retirer @NotBlank sur 5 champs
+dto/professional/ProfessionalResponse.java  ← ajouter streetNumber, street, zipCode, city
+entity/Professional.java                    ← retirer nullable = false sur 5 colonnes
+mapper/ProfessionalMapper.java              ← inclure adresse dans toResponse, stratégie null sur update
+db/changelog/changes/
+  00X-professional-nullable-fields.yaml    ← ALTER TABLE professionals DROP NOT NULL sur 5 colonnes
+```
+
+### Liquibase changeset
+```yaml
+- changeSet:
+    id: 00X-professional-nullable-fields
+    author: selim
+    changes:
+      - dropNotNullConstraint:
+          tableName: professionals
+          columnName: first_name
+          columnDataType: varchar(255)
+      - dropNotNullConstraint:
+          tableName: professionals
+          columnName: street_number
+          columnDataType: varchar(255)
+      - dropNotNullConstraint:
+          tableName: professionals
+          columnName: street
+          columnDataType: varchar(255)
+      - dropNotNullConstraint:
+          tableName: professionals
+          columnName: zip_code
+          columnDataType: varchar(255)
+      - dropNotNullConstraint:
+          tableName: professionals
+          columnName: city
+          columnDataType: varchar(255)
+```
+
+### Tests à mettre à jour
+- `ProfessionalServiceImplTest` : créer un professionnel sans `firstName` et sans adresse → succès.
+- Tests controller existants : vérifier que la réponse inclut désormais les champs d'adresse.
+
+### Critères de validation
+- `./mvnw verify` vert.
+- `POST /api/professionals` sans `firstName` ni adresse → 201 Created.
+- `GET /api/professionals/{id}` renvoie `streetNumber`, `street`, `zipCode`, `city` (null si absents).
+- Le formulaire Angular d'édition est pré-rempli avec l'adresse (pré-condition côté front déjà en place depuis lot 6).
 
 ---
 
