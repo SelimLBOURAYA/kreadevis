@@ -39,6 +39,11 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
+| 17  | feat/lot-17-client-embedded-address | ⬜ optionnel | API           |
+| 18  | feat/lot-18-jwt-userdetails-cache   | ⬜ optionnel | perf          |
+| 19  | feat/lot-19-quote-daterange-robustness | ⬜ optionnel | API        |
+| 20  | feat/lot-20-csv-import-policy       | ⬜ optionnel | métier        |
+| 21  | feat/lot-21-cascade-softdelete-policy | ⬜ optionnel | métier      |
 
 **Ordonnancement des derniers lots** : le lot 10 (Liquibase) est posé en premier car toutes les évolutions de schéma des lots suivants doivent passer par des changesets versionnés. Les lots 12→14 traitent ensuite l'intégrité métier, la pagination et l'hygiène API. Les lots 15 et 16, à dominante sécurité, sont volontairement positionnés en fin de cycle pour tester les fonctionnalités métier sans buter sur des restrictions d'autorisation. Voir `security.md` pour la justification technique des lots 15-16.
 
@@ -717,14 +722,22 @@ Standardiser le contrat HTTP, exposer une spec consommable par le front Angular,
 - `application.yaml` : renommer `facture-dir` → `invoice-dir`, `output-dir` reste, `"FACTURE"` (constante côté Java) → `"INVOICE"`.
 - Migration interne uniquement, pas de breaking change visible côté API.
 
+**6. Audit fields sur les entités**
+- Ajouter `createdAt` (`@CreationTimestamp`) et `updatedAt` (`@UpdateTimestamp`) sur `Client`, `Product`, `Professional`, `Address`, `Quote`, `QuoteItem`, `User`. Hibernate gère le peuplement automatiquement.
+- Activer `@EntityListeners(AuditingEntityListener.class)` au niveau de chaque entité concernée (ou via une `@MappedSuperclass AbstractAuditable`) pour récupérer `createdBy` / `updatedBy` (`@CreatedBy` / `@LastModifiedBy`) — branchés sur `SecurityContextHolder` via `AuditorAware<Long>`. `Quote.createdBy` (existant) est ré-utilisé tel quel.
+- Liquibase changeset correspondant : ajout `created_at`, `updated_at`, `updated_by` sur toutes les tables d'entité. `created_by` déjà présent sur `quotes` (et ajouté sur `clients`/`products` au lot 15).
+- Exposer `createdAt` / `updatedAt` dans les `*Response` (lecture seule, format ISO-8601). Rationale : besoin tracé pour l'audit côté front (liste devis triée par date de modification, debug support).
+
 ### Tests
 - Vérifier dans les `@WebMvcTest` existants que `POST` renvoie 201 et `Location`.
 - Test smoke OpenAPI : `GET /v3/api-docs` retourne 200, JSON valide.
+- `@DataJpaTest` : créer une entité, vérifier `createdAt` non null après flush ; modifier, vérifier `updatedAt` mis à jour.
 
 ### Critères de validation
 - `./mvnw verify` vert.
 - `/swagger-ui.html` accessible en dev, désactivé en prod.
 - Aucun `@JsonIgnoreProperties` ne subsiste dans le package `entity`.
+- Toute entité créée via API porte `createdAt` non null, `updatedAt = createdAt` au moment de la création.
 
 ---
 
@@ -761,20 +774,31 @@ Standardiser le contrat HTTP, exposer une spec consommable par le front Angular,
 - `UserController` : `@PreAuthorize("hasRole('ADMIN')")` sur **tous** les endpoints.
 - Activer `@EnableMethodSecurity` dans `SecurityConfig`.
 - Endpoint nouveau `POST /api/admin/users` pour créer un autre admin (registration publique ne crée que des `ROLE_USER`).
+- Fermer `POST /api/auth/register` aux utilisateurs anonymes une fois `POST /api/admin/users` en place — `SecurityConfig` : retirer `/api/auth/register` des `permitAll` (la création d'utilisateur passe désormais par l'admin).
 
 **5. Cohérence des 404 vs 403**
 - Si un user tente de lire un quote d'un autre user : retourner **404 Not Found** (et pas 403) pour ne pas leaker l'existence de la ressource — bonne pratique OWASP.
+
+**6. Exposer les rôles côté client (pré-requis frontend lot 10)**
+- Ajouter `roles: List<String>` dans `AuthResponse` (peuplé depuis `user.getAuthorities()`).
+- Ajouter un claim `roles` dans le JWT (`JwtUtils.generateToken(User user)` au lieu de `generateToken(String username)`).
+- Endpoint `GET /api/users/me` retournant le `UserResponse` complet (id, login, email, roles) — utilisé par le front pour réhydrater l'état utilisateur après refresh navigateur sans dépendre du contenu du token.
+- Rationale : sans ces trois ajouts, le `adminGuard` côté Angular (frontend lot 10) ne peut pas distinguer admin/user et le lien "Utilisateurs" reste toujours caché. Le filtrage RBAC côté serveur (cf. §4) reste la source d'autorité, mais le front a besoin de la même info pour cacher l'UI interdite.
 
 ### Tests à ajouter
 - `userA crée un quote, userB tente de le lire` → 404.
 - `userB tente DELETE /api/users/{idA}` → 403.
 - `admin liste /api/clients` → voit tous les clients tous users confondus.
 - Tester pour chaque ressource owned : Quote, Client, Product.
+- `GET /api/users/me` authentifié → renvoie `id, login, email, roles` ; anonymous → 401.
+- JWT décodé contient bien le claim `roles` (test `JwtUtils`).
+- `POST /api/auth/register` anonyme → 401 (anciennement 200).
 
 ### Critères de validation
 - `./mvnw verify` vert.
 - Scénario Postman complet : créer admin + user1 + user2, vérifier cloisonnement.
 - Aucun endpoint authentifié n'expose les données d'autrui sans `ROLE_ADMIN`.
+- Le front Angular (`frontend lot 10`) peut implémenter son `adminGuard` uniquement à partir des nouveautés du §6 — pas besoin d'appel supplémentaire à des endpoints internes.
 
 ---
 
@@ -820,3 +844,122 @@ Appliquer les mesures de durcissement décrites en détail dans `security.md`. C
 - `git grep -i "changeme\|app1pass"` à blanc.
 - `.env.example` présent, listant chaque variable utilisée par l'app.
 - `security.md` reflète exactement ce qui a été implémenté (mettre à jour si écart).
+
+---
+
+## LOT 17 — Client + adresse imbriquée (optionnel) ⬜
+
+**Branche :** `feat/lot-17-client-embedded-address`
+**Origine :** audit architectural (finding A3)
+
+### Contexte
+Aujourd'hui `ClientServiceImpl.create/update` prend un `addressId` existant. Le front doit donc enchaîner `POST /api/addresses` puis `POST /api/clients`. Si le second appel échoue, **l'adresse est orpheline en base** (pas de transaction côté serveur entre les deux). Idem pour `update`. Cette dette s'amplifie à chaque écran qui touche un client.
+
+### Périmètre
+- `ClientRequest` : remplacer `addressId: Long` par `address: AddressRequest` (DTO imbriqué).
+- `ClientServiceImpl.create` : crée l'`Address` puis le `Client` **dans la même `@Transactional`** ; rollback complet si une des deux étapes échoue.
+- `ClientServiceImpl.update` : met à jour l'adresse existante (lookup via `client.getAddress().getId()`) puis met à jour le client. Pas d'`addressId` côté `Request`.
+- `AddressController` : conserver pour les cas explicites (rare) ; documenter qu'il n'est plus utilisé par le flux client.
+- Frontend : `ClientService.create/update` (`features/clients/client.service.ts:58-85`) simplifié à un seul `POST/PUT /api/clients`. Tests adaptés (un seul `expectOne` au lieu de deux).
+
+### Risques / breaking
+- Tous les consommateurs de `POST /api/clients` cassent : le front est le seul consommateur connu — sync à faire dans le même PR.
+- Si un `AddressController` est appelé par un tiers (intégration, script), tracer avant de toucher.
+
+### Critères de validation
+- `./mvnw verify` vert. Tests `ClientServiceImplTest` couvrent : rollback si client invalide après création address ; update d'adresse propage les changements.
+- Frontend `npm test` vert avec un seul appel HTTP côté `ClientService`.
+- Postman : `POST /api/clients` avec adresse imbriquée → 201 + corps complet ; payload invalide (lastName manquant) → 400 et aucune adresse créée en DB.
+
+---
+
+## LOT 18 — Cache `UserDetails` dans `JwtAuthFilter` (optionnel) ⬜
+
+**Branche :** `feat/lot-18-jwt-userdetails-cache`
+**Origine :** audit architectural (finding A6)
+
+### Contexte
+`JwtAuthFilter.doFilterInternal` appelle `userDetailsService.loadUserByUsername(...)` à **chaque requête authentifiée** → SELECT user + JOIN `user_roles` à chaque appel API. À faible volume c'est invisible, mais c'est de la dette qui empire à mesure que les endpoints se multiplient.
+
+### Périmètre
+- Soit (option A — minimal, retenue par défaut) : cache `Caffeine` en mémoire avec TTL court (ex. 60 s) et taille max (1000), keyé sur `username`. Dépendance `caffeine` ajoutée. Bean `Cache<String, UserDetails>` injecté dans `JwtAuthFilter`.
+- Soit (option B — meilleur, nécessite lot 15 §6 livré) : embarquer `roles` directement dans le JWT comme claim, ne plus appeler le `UserDetailsService` du tout dans le filter ; construire l'`Authentication` à partir du seul token. Trade-off : impossible de révoquer immédiatement un user (faut attendre l'expiration du token).
+- Cohabiter avec une éventuelle logique de révocation (lot 16 refresh-token) : si refresh devient stateful, le cache doit être invalidé sur révocation.
+
+### Risques
+- Option A : un user désactivé reste authentifié jusqu'à expiration du cache (60 s max).
+- Option B : pas de révocation immédiate possible — confronter à la politique de sécurité.
+
+### Critères de validation
+- Benchmark grossier avant/après (`ab -n 200 -c 10` sur `GET /api/clients`) : nombre de SELECT users observé en log devrait chuter d'un facteur ~10 avec option A.
+- `./mvnw verify` vert (tests existants ne doivent pas régresser).
+
+---
+
+## LOT 19 — Robustesse du filtre date-range sur quotes (optionnel) ⬜
+
+**Branche :** `feat/lot-19-quote-daterange-robustness`
+**Origine :** audit architectural (finding M6)
+
+### Contexte
+`QuoteRepository.findByDateRange(LocalDate startDate, LocalDate endDate)` est appelé par `QuoteServiceImpl.findAll(null, null)` quand l'utilisateur ne passe pas de filtre. Le comportement exact de la requête JPQL/SQL avec deux paramètres `null` dépend de l'implémentation actuelle — si elle utilise `BETWEEN`, elle retournera **0 résultat** au lieu de tout retourner. Bug silencieux côté API.
+
+### Périmètre
+- Lire la définition actuelle de `findByDateRange` et la requête associée. Décider :
+  - Soit faire un `@Query` qui gère explicitement `:start IS NULL OR date >= :start` etc. (et idem pour end).
+  - Soit côté service : si `startDate == null && endDate == null` → appeler `findAllByActiveTrue()` standard ; sinon `findByDateRange`.
+- Ajouter un test `@DataJpaTest` couvrant les 4 cas : aucun filtre, start seul, end seul, les deux.
+
+### Critères de validation
+- `GET /api/quotes` (sans param) retourne **tous** les quotes actifs.
+- `GET /api/quotes?startDate=...` retourne ceux ≥ start.
+- `GET /api/quotes?endDate=...` retourne ceux ≤ end.
+- `GET /api/quotes?startDate=...&endDate=...` retourne l'intersection.
+- `./mvnw verify` vert.
+
+---
+
+## LOT 20 — Politique de transactionnalité de l'import CSV (optionnel) ⬜
+
+**Branche :** `feat/lot-20-csv-import-policy`
+**Origine :** audit architectural (finding M7)
+
+### Contexte
+`CsvImportServiceImpl.importProducts` est annoté `@Transactional` — un crash après la ligne 1000 sur 2000 **annule tout** l'import. Selon le métier, ce comportement est souhaité (atomicité) ou contre-productif (on préfère garder les 1000 lignes valides et retourner les erreurs des 1000 suivantes en bulk).
+
+### Périmètre — à arbitrer en début de lot
+**Option A — Atomique (statu quo)** : garder `@Transactional` global. Documenter explicitement dans `CLAUDE.md` backend et dans la réponse `CsvImportResult` (champ `policy: "atomic"`). Aucun changement de code.
+
+**Option B — Best-effort par ligne** : enlever le `@Transactional` global, encadrer chaque `persistOrUpdate(row, ...)` dans une transaction propre (`TransactionTemplate` ou `@Transactional(propagation = REQUIRES_NEW)` sur une méthode dédiée). Les lignes valides sont persistées même si d'autres lignes plus loin échouent.
+
+**Option C — Hybride** : phase 1 = parse + valide TOUT en mémoire (lots existants déjà partiellement), phase 2 = persiste tout en batch atomique. Si phase 1 échoue → rien ne va en base ; si phase 2 échoue (cas rare type contrainte unique) → erreur claire sans corruption.
+
+### Critères de validation
+- Le choix est tracé dans `CLAUDE.md` backend (section "CSV import policy") avec rationale métier.
+- Si option B/C : tests d'intégration couvrant import 5 lignes dont la 3e invalide → 4 produits en DB + 1 erreur retournée (option B) ou 0 produit en DB + 1 erreur retournée (option C en cas de violation contrainte phase 2).
+- `./mvnw verify` vert.
+
+---
+
+## LOT 21 — Politique de cascade sur soft-delete client → quotes (optionnel) ⬜
+
+**Branche :** `feat/lot-21-cascade-softdelete-policy`
+**Origine :** audit architectural (finding M15)
+
+### Contexte
+`ClientServiceImpl.delete(id)` passe `client.active = false` mais **ne touche pas les quotes liées**. Conséquences observables :
+- Les quotes du client supprimé restent listées par `GET /api/clients/{id}/quotes` (et le client est techniquement encore accessible via `findById` si l'appelant connaît l'id).
+- `QuoteResponse.client` peut référencer un client `active=false` — UX incohérente côté front si l'écran liste quotes affiche le nom du client.
+
+### Périmètre — décision métier à arbitrer
+**Option A — Préservation totale (statu quo, à documenter)** : un client soft-deleté garde ses quotes lisibles. Argument : audit / traçabilité légale (un devis émis avant suppression doit rester consultable). Coût : ajouter une indication UI (`client.active === false` → label "Client archivé") + cas test backend explicite.
+
+**Option B — Soft-delete en cascade** : `ClientServiceImpl.delete` soft-delete aussi les quotes (`quote.active = false`) et leurs items. Argument : cohérence des listes. Inconvénient : perte de visibilité sur les devis historiques.
+
+**Option C — Refuser le delete si quotes existent** : `ClientServiceImpl.delete` lève une `IllegalStateException` (mappée 409 après lot 12) si `clientRepository.countActiveQuotes(clientId) > 0`. L'utilisateur doit d'abord annuler/archiver les devis. Argument : force l'intention.
+
+### Critères de validation
+- Choix tracé dans `CLAUDE.md` backend (section "Soft-delete cascade policy").
+- Tests adaptés : `ClientServiceImplTest.delete` valide le comportement choisi sur un client avec 2 quotes.
+- Frontend : si option A, ajouter un FIXME dans `quote-list.component.html` pour traiter visuellement les clients archivés (futur lot UX polish).
+- `./mvnw verify` vert.
