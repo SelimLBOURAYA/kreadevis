@@ -26,6 +26,7 @@ public class Quote {
     @Column(name = "total_price")
     private BigDecimal totalPrice;
 
+    @Builder.Default
     @Column
     private LocalDate date = LocalDate.now();
 
