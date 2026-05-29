@@ -1,19 +1,5 @@
-# Session startup — mandatory
+# Session startup
 
-Conventions transversales chargées depuis `~/.claude/coding-conventions.md` (workflow par lot, commits, patterns interdits, ask-before-doing, secrets).
+See `~/.claude/coding-conventions.md` §9 for the shared startup sequence (read `CLAUDE.md` + `lots.md`, `git log/status/branch`, 3-line summary).
 
-Before responding to any user request, run these silently :
-
-1. Read `CLAUDE.md` — project-specific stack, architecture rules, secrets
-2. Read `lots.md` — lot specifications and status
-3. `git log --oneline -10`
-4. `git status`
-5. `git branch --show-current`
-6. `./mvnw compile -q` — verify the project compiles (silent, report only if it fails)
-
-Then summarize in exactly 3 lines :
-- **Current lot**: which lot is active or next
-- **State**: what is done, what is pending, any uncommitted work
-- **Next action**: what you will do first
-
-Do not start the user's request before completing this sequence.
+No project-specific addition — the build (`./mvnw verify`) stays out of the startup sequence and runs only on demand or before commit.
