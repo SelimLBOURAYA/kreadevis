@@ -35,7 +35,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 10  | chore/lot-10-liquibase         | ✅ terminé  | infra              |
 | 11  | feat/lot-11-quote-email-send   | ⬜ à faire  | métier             |
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
-| 12  | feat/lot-12-quote-integrity    | 🔄 en cours | métier             |
+| 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
 | 12b | feat/lot-12b-front-unblock     | ⬜ à faire  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
@@ -517,19 +517,30 @@ spring:
 
 ---
 
-## LOT 12 — Intégrité métier devis 🔄
+## LOT 12 — Intégrité métier devis ✅
 
-**Branche :** `feat/lot-12-quote-integrity`
-**Commits cibles :**
-- `fix(12): make quote reads transactional to fix LazyInitializationException`
-- `feat(12): guard quote item operations against finalized status`
-- `feat(12): recompute totalPrice on item add/update/delete`
-- `feat(12): snapshot vatRate on QuoteItem, compute HT/TVA/TTC`
-- `fix(12): exclude inactive items from totalPrice`
-- `fix(12): map business IllegalStateException to 409 Conflict`
-- `fix(12): enforce item ownership on update and delete`
-- `fix(12): forbid deleting a finalized quote`
-- `test(12): add non-transactional integration test with liquibase enabled`
+**Branche :** `feat/lot-12-quote-integrity` — PR #14
+**Commits :**
+- `5061847 feat(12): split quote totalPrice into HT/VAT/TTC, snapshot vatRate on items`
+- `59d263f feat(12): guard quote items against finalized/cancelled, recompute totals on every change`
+- `7b587c9 feat(12): render quote PDF with HT/TVA/TTC breakdown`
+- `52a65b3 fix(12): map business IllegalStateException to 409 Conflict`
+- `de24ecd test(12): cover status guards, VAT computation, date realignment, 409 mapping`
+- `b0e1f24 refactor(12): move recomputeTotals from QuoteTotals utility to Quote entity` *(PR review)*
+- `206cd03 fix(12): add transactional reads, item ownership check, and delete guard`
+- `00f75af test(12): add non-transactional integration test for quote reads and PDF`
+- `eeb8535 docs(12): add lot-12 audit report`
+
+**Audit :** `docs/audits/lot-12.md` — 0 Critical, 3 Warning (N+1 préexistants, listes non paginées, Liquibase inerte sur SB4)
+
+**Fait :**
+- Points 0→7 implémentés — lectures transactionnelles, garde-fous statut, recalcul totals, snapshot TVA + TTC, cohérence date↔référence, mapping 409, appartenance item↔devis, garde suppression devis finalisé
+- `QuoteTotals` supprimé → `Quote.recomputeTotals()` (rich domain model, convention §1)
+- 106 tests, 0 failures, JaCoCo gate verte
+- Test d'intégration non transactionnel ajouté (`QuoteReadIntegrationTest`)
+
+**Réserve :** Liquibase non exercé par les tests (Spring Boot 4 sans auto-configuration Liquibase) → lot dédié recommandé par l'audit
+**Problèmes connus :** N+1 lazy-loads sur `findAll`/`findByClientId` → lot 13 (pagination) atténuera ; chemin `include` dans `db.changelog-master.yaml` probablement incorrect (masqué car Liquibase ne tourne pas)
 
 ### Objectif
 Corriger les divergences entre l'état stocké et l'état affiché des devis, et exposer un total HT/TVA/TTC cohérent. Ces bugs sont indépendants de la sécurité et peuvent être validés manuellement via Postman ou le front Angular dès qu'ils sont livrés. **Étendu suite à l'audit du 10/07/2026** (points 0, 6 et 7 + test d'intégration).
