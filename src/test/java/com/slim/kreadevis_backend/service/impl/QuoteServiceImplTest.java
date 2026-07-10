@@ -315,6 +315,17 @@ class QuoteServiceImplTest {
     }
 
     @Test
+    void delete_shouldThrow_whenFinalized() {
+        Quote quote = new Quote();
+        quote.setStatus(QuoteStatus.FINALIZED);
+        when(quoteRepository.findById(1L)).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> quoteService.delete(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Cannot delete a finalized quote");
+    }
+
+    @Test
     void delete_shouldThrow_whenNotFound() {
         when(quoteRepository.findById(99L)).thenReturn(Optional.empty());
 

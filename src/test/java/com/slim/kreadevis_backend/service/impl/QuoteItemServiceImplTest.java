@@ -111,9 +111,11 @@ class QuoteItemServiceImplTest {
     @Test
     void deleteItem_shouldExcludeFromTotals() {
         Quote quote = quoteWithStatus(QuoteStatus.DRAFT);
+        quote.setId(1L);
         QuoteItem item = QuoteItem.builder()
                 .id(10L)
                 .active(true)
+                .quote(quote)
                 .unitPrice(new BigDecimal("50.00"))
                 .vatRate(new BigDecimal("10"))
                 .totalPrice(new BigDecimal("100.00"))
@@ -162,6 +164,46 @@ class QuoteItemServiceImplTest {
         assertThat(quote.getTotalPriceHt()).isEqualByComparingTo("300.00");
         assertThat(quote.getTotalVat()).isEqualByComparingTo("45.50");
         assertThat(quote.getTotalPriceTtc()).isEqualByComparingTo("345.50");
+    }
+
+    // --- item ownership ---
+
+    @Test
+    void updateItem_shouldThrow_whenItemDoesNotBelongToQuote() {
+        Quote quote = quoteWithStatus(QuoteStatus.DRAFT);
+        quote.setId(1L);
+        Quote otherQuote = new Quote();
+        otherQuote.setId(2L);
+        QuoteItem item = QuoteItem.builder()
+                .id(10L)
+                .active(true)
+                .quote(otherQuote)
+                .build();
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteItemRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.updateItem(1L, 10L, new QuoteItemRequest(5L, 1L)))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+                .hasMessageContaining("does not belong to quote");
+    }
+
+    @Test
+    void deleteItem_shouldThrow_whenItemDoesNotBelongToQuote() {
+        Quote quote = quoteWithStatus(QuoteStatus.DRAFT);
+        quote.setId(1L);
+        Quote otherQuote = new Quote();
+        otherQuote.setId(2L);
+        QuoteItem item = QuoteItem.builder()
+                .id(10L)
+                .active(true)
+                .quote(otherQuote)
+                .build();
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteItemRepository.findById(10L)).thenReturn(Optional.of(item));
+
+        assertThatThrownBy(() -> service.deleteItem(1L, 10L))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+                .hasMessageContaining("does not belong to quote");
     }
 
     // --- helpers ---

@@ -34,22 +34,26 @@ public class QuoteServiceImpl implements QuoteService {
     private final QuoteMapper quoteMapper;
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate) {
         return quoteRepository.findByDateRange(startDate, endDate).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public QuoteResponse findById(Long id) {
         return quoteMapper.toResponse(quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id)));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuoteResponse> findByClientId(Long clientId) {
         return quoteRepository.findByClientIdAndActiveTrue(clientId).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public QuoteResponse findByReferenceCode(String referenceCode) {
         return quoteMapper.toResponse(quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
@@ -117,6 +121,9 @@ public class QuoteServiceImpl implements QuoteService {
     public void delete(Long id) {
         Quote quote = quoteRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        if (quote.getStatus() == QuoteStatus.FINALIZED) {
+            throw new IllegalStateException("Cannot delete a finalized quote");
+        }
         quote.getItems().forEach(item -> item.setActive(false));
         quote.setActive(false);
         quoteRepository.save(quote);

@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -37,6 +38,7 @@ public class PdfServiceImpl implements PdfService {
     private final ResourceLoader resourceLoader;
 
     @Override
+    @Transactional(readOnly = true)
     public byte[] generateQuotePdf(Long quoteId) {
         Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
@@ -44,6 +46,7 @@ public class PdfServiceImpl implements PdfService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public byte[] generateInvoicePdf(Long quoteId) {
         Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));

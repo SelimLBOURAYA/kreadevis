@@ -60,6 +60,9 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         Quote quote = loadModifiableQuote(quoteId);
         QuoteItem item = quoteItemRepository.findByIdAndActiveTrue(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
+        if (!item.getQuote().getId().equals(quoteId)) {
+            throw new EntityNotFoundException("QuoteItem " + itemId + " does not belong to quote " + quoteId);
+        }
         Product product = productRepository.findByIdAndActiveTrue(request.productId())
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
 
@@ -82,6 +85,9 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         Quote quote = loadModifiableQuote(quoteId);
         QuoteItem item = quoteItemRepository.findById(itemId)
                 .orElseThrow(() -> new EntityNotFoundException("QuoteItem not found: " + itemId));
+        if (!item.getQuote().getId().equals(quoteId)) {
+            throw new EntityNotFoundException("QuoteItem " + itemId + " does not belong to quote " + quoteId);
+        }
         item.setActive(false);
         quoteItemRepository.save(item);
 
