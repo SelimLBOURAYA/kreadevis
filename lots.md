@@ -8,6 +8,8 @@ Migration de `kreadevis` (Spring Boot 3.3.4 / MVC / JSP) vers `kreadevis-backend
 - Nouveau projet : `/home/selim/ENV/projets/kreadevis-backend/`
 - Stack cible : Spring Boot 4.0.6, Java 25, PostgreSQL 17 (Docker), MapStruct, OpenPDF, JWT
 
+**Périmètre produit** : Kreadevis est un logiciel de **devis** uniquement — la facturation est **hors périmètre** (décision du 10/07/2026). L'endpoint « facture » hérité du legacy (`GET /api/quotes/{id}/invoice/pdf`, config `facture-dir`) sera **supprimé** au lot 14, pas mis en conformité.
+
 ## Règle transversale — tests par lot
 
 **Chaque lot inclut ses tests unitaires.** Les tests ne sont pas regroupés à la fin du projet : ils sont écrits en même temps que le code du lot, dans la même PR. `./mvnw verify` doit passer vert avant tout commit et avant l'ouverture de la PR. Voir `CLAUDE.md` (section *Workflow par lot*) pour la règle complète.
@@ -34,12 +36,20 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 11  | feat/lot-11-quote-email-send   | ⬜ à faire  | métier             |
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
 | 12  | feat/lot-12-quote-integrity    | 🔄 en cours | métier             |
+| 12b | feat/lot-12b-front-unblock     | ⬜ à faire  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
 
 **Ordonnancement des derniers lots** : le lot 10 (Liquibase) est posé en premier car toutes les évolutions de schéma des lots suivants doivent passer par des changesets versionnés. Les lots 12→14 traitent ensuite l'intégrité métier, la pagination et l'hygiène API. Les lots 15 et 16, à dominante sécurité, sont volontairement positionnés en fin de cycle pour tester les fonctionnalités métier sans buter sur des restrictions d'autorisation. Voir `security.md` pour la justification technique des lots 15-16.
+
+**Audit du 10/07/2026** — un audit croisé back/front a confirmé (test à l'appui) un bug bloquant : `LazyInitializationException` sur **toutes les lectures de devis** (détail au lot 12, point 0). Il a aussi montré que l'intégration front↔back n'a **jamais** été exercée : aucun bean CORS côté back, lot 0 front non réalisé, lots front validés uniquement avec HTTP mocké. Conséquences sur le plan :
+- **lot 12 étendu** : fix transactionnel en tête de lot, appartenance item↔devis, garde de suppression, test d'intégration non transactionnel avec Liquibase actif ;
+- **nouveau lot 12b** : CORS (avancé depuis le lot 16), `GET /api/users/me`, correctif header CSV — débloque les lots front 6→10 ;
+- **lot 14** : le périmètre « facture » est **retiré** du produit (logiciel de devis uniquement), au lieu d'être renommé ;
+- **lot 16** : ajouts §8–10 (identité société externalisée, nettoyage `/actuator`, identifiant canonique) ;
+- deux décisions produit à acter — voir « Questions ouvertes » en fin de fichier.
 
 ---
 
@@ -147,6 +157,8 @@ Réalisé :
 
 **Branche :** `feat/lot-7-pdf` — PR #9 mergée
 **Commit :** `8247200 feat(7): implement PDF generation with OpenPDF`
+
+> ⚠️ **Périmètre facture retiré a posteriori** (décision du 10/07/2026) : Kreadevis est un logiciel de devis, pas de facturation. `generateInvoicePdf` et `GET /api/quotes/{id}/invoice/pdf` livrés par ce lot seront supprimés au lot 14 (§5).
 
 ### Objectif
 Générer devis et factures en PDF via OpenPDF. Aucun chemin hardcodé (config externalisée déjà en place dans `application.yaml`).
@@ -448,10 +460,12 @@ Groupement par `createdBy` côté `ReminderService` (Java stream).
 
 ---
 
-## LOT 10 — Liquibase (migrations versionnées) ⬜
+## LOT 10 — Liquibase (migrations versionnées) ✅
 
-**Branche :** `chore/lot-10-liquibase`
-**Commit cible :** `chore(10): introduce liquibase, baseline current schema`
+**Branche :** `chore/lot-10-liquibase` — PR #13 mergée
+**Commit :** `9bec1e3 chore(10): introduce liquibase, baseline current schema (#13)`
+
+> ⚠️ **Réserve (audit 10/07/2026)** : le profil de test désactive Liquibase (`liquibase.enabled: false` + `ddl-auto: create-drop`) — les changesets ne sont donc jamais exercés par `./mvnw verify`. Filet posé au lot 12 (test d'intégration avec Liquibase actif).
 
 ### Objectif
 Sortir du mode `ddl-auto: update` (dev) et `validate` (prod) qui rend impossible une mise à jour de schéma maîtrisée en production. Toutes les évolutions de schéma à partir de ce lot sont décrites en **changesets Liquibase** versionnés dans le repo.
@@ -503,20 +517,29 @@ spring:
 
 ---
 
-## LOT 12 — Intégrité métier devis ⬜
+## LOT 12 — Intégrité métier devis 🔄
 
 **Branche :** `feat/lot-12-quote-integrity`
 **Commits cibles :**
+- `fix(12): make quote reads transactional to fix LazyInitializationException`
 - `feat(12): guard quote item operations against finalized status`
 - `feat(12): recompute totalPrice on item add/update/delete`
 - `feat(12): snapshot vatRate on QuoteItem, compute HT/TVA/TTC`
 - `fix(12): exclude inactive items from totalPrice`
 - `fix(12): map business IllegalStateException to 409 Conflict`
+- `fix(12): enforce item ownership on update and delete`
+- `fix(12): forbid deleting a finalized quote`
+- `test(12): add non-transactional integration test with liquibase enabled`
 
 ### Objectif
-Corriger les divergences entre l'état stocké et l'état affiché des devis, et exposer un total HT/TVA/TTC cohérent. Ces bugs sont indépendants de la sécurité et peuvent être validés manuellement via Postman ou le front Angular dès qu'ils sont livrés.
+Corriger les divergences entre l'état stocké et l'état affiché des devis, et exposer un total HT/TVA/TTC cohérent. Ces bugs sont indépendants de la sécurité et peuvent être validés manuellement via Postman ou le front Angular dès qu'ils sont livrés. **Étendu suite à l'audit du 10/07/2026** (points 0, 6 et 7 + test d'intégration).
 
 ### Périmètre
+
+**0. Fix bloquant — lectures de devis transactionnelles** *(constat d'audit confirmé par test le 10/07/2026)*
+- `open-in-view: false` + `Quote.items` LAZY + services non transactionnels en lecture : `LazyInitializationException` sur `GET /api/quotes`, `/api/quotes/{id}`, `/api/quotes/search`, `/api/clients/{id}/quotes` et les endpoints PDF (`QuoteMapperImpl` touche la collection hors session). Ces endpoints ne fonctionnent que dans les tests (slices mockés / `@DataJpaTest` transactionnel), jamais sur une app réellement lancée.
+- Fix : `@Transactional(readOnly = true)` sur les lectures de `QuoteServiceImpl` et `PdfServiceImpl` (ou fetch join dédié dans `QuoteRepository`).
+- À livrer **en premier** : tout le reste du lot se valide par-dessus.
 
 **1. Garde-fous sur statut**
 - `QuoteItemServiceImpl.addItem/updateItem/deleteItem` : refuser si `quote.status ∈ { FINALIZED, CANCELLED }`. Lever `IllegalStateException("Cannot modify items of a finalized/cancelled quote")`.
@@ -543,15 +566,66 @@ Corriger les divergences entre l'état stocké et l'état affiché des devis, et
 - `GlobalExceptionHandler` : nouveau mapping `IllegalStateException` → **409 Conflict** (cas "déjà finalisé", "cannot modify").
 - Conserver le 500 uniquement pour `Exception.class` (fourre-tout).
 
+**6. Appartenance item ↔ devis** *(audit 10/07/2026)*
+- `QuoteItemServiceImpl.updateItem/deleteItem` ignorent le `quoteId` du path : n'importe quel item de n'importe quel devis est modifiable via `PUT /api/quotes/{id}/items/{itemId}`.
+- Fix : vérifier `item.getQuote().getId().equals(quoteId)`, sinon `EntityNotFoundException` (→ 404).
+
+**7. Garde de suppression** *(audit 10/07/2026)*
+- `QuoteServiceImpl.delete` accepte un devis `FINALIZED` (document contractuel). Refuser avec `IllegalStateException` (→ 409 via le point 5).
+
 ### Tests à ajouter
 - `QuoteItemServiceImplTest` : addItem sur quote FINALIZED → exception ; updateItem idem ; deleteItem idem.
-- `QuoteServiceImplTest` : ajout d'item recalcule le total ; suppression d'item recalcule le total ; items inactifs exclus du total ; finalize avec items mixtes (TVA 5,5 / 10 / 20) calcule TTC correctement.
+- `QuoteItemServiceImplTest` : updateItem/deleteItem avec un `quoteId` ne correspondant pas à l'item → 404.
+- `QuoteServiceImplTest` : ajout d'item recalcule le total ; suppression d'item recalcule le total ; items inactifs exclus du total ; finalize avec items mixtes (TVA 5,5 / 10 / 20) calcule TTC correctement ; delete d'un devis FINALIZED → exception.
 - `GlobalExceptionHandler` indirectement testé via les controller tests existants (mettre à jour pour 409).
+- **Test d'intégration non transactionnel** (`@SpringBootTest` + MockMvc, classe de test sans `@Transactional`) : `GET /api/quotes/{id}` et `GET /api/quotes/{id}/pdf` sur un devis avec items → 200. C'est le seul type de test qui attrape les régressions lazy (les `@WebMvcTest` mockent les services, les `@DataJpaTest` gardent la session ouverte).
+- Dans ce test, **activer Liquibase sur H2** (profil dédié sans `liquibase.enabled: false` ni `ddl-auto: create-drop`) pour que les changesets soient enfin exercés par la gate — aujourd'hui un changeset cassé passe `./mvnw verify`. Si le changelog n'est pas H2-compatible, basculer ce test sur Testcontainers PostgreSQL.
 
 ### Critères de validation
 - `./mvnw verify` vert (couverture en hausse).
 - Postman : tenter d'ajouter un item à un devis finalisé → réponse `409 Conflict`.
 - PDF d'un devis multi-items multi-TVA : affiche bien HT / TVA / TTC.
+- `GET /api/quotes/{id}` et `GET /api/quotes/{id}/pdf` répondent 200 sur une app réellement lancée (pas seulement en slice de test).
+- Un changeset Liquibase volontairement cassé fait échouer la gate (vérification ponctuelle, non commitée).
+
+---
+
+## LOT 12b — Débloquage front : CORS, /users/me, correctif CSV ⬜
+
+**Branche :** `feat/lot-12b-front-unblock`
+**Commits cibles :**
+- `feat(12b): wire cors configuration source on app.cors.allowed-origins`
+- `feat(12b): expose GET /api/users/me with roles`
+- `fix(12b): honor csv file header order on product import`
+
+### Objectif
+Lever les trois blocages identifiés à l'audit du 10/07/2026 qui empêchent le front Angular d'avancer (lots front 6→10). Peut être mené en parallèle du lot 12 (pas de fichier commun hors tests).
+
+### Périmètre
+
+**1. CORS effectif** *(extrait du lot 16, avancé ici)*
+- La propriété `app.cors.allowed-origins` existe dans `application.yaml` mais n'est lue **nulle part** : aucun bean `CorsConfigurationSource`, pas de `.cors()` dans `SecurityConfig` → tout appel navigateur depuis `http://localhost:4200` est bloqué au preflight. Le front n'a jamais pu parler au back.
+- Bean `CorsConfigurationSource` branché sur la propriété + `.cors(withDefaults())` dans la chaîne de filtres.
+- Le durcissement (méthodes/headers restreints, `allowCredentials`, origines prod) reste au lot 16.
+
+**2. Utilisateur courant + rôles**
+- Le front n'a aucun moyen de connaître l'utilisateur connecté : `AuthResponse` ne contient que le token, le JWT ne porte pas les rôles, pas d'endpoint `me`. Le front fabrique un user factice (`id 0, roles []`) — bloque le lot front 10 (admin users) et l'affichage du profil.
+- `GET /api/users/me` → `UserResponse` (id, login, email, roles) depuis le `SecurityContextHolder`.
+- Optionnel : enrichir `AuthResponse` avec le `UserResponse` pour économiser un aller-retour au login.
+
+**3. Correctif import CSV : header réel du fichier ignoré**
+- `CSVFormat` est construit avec `setHeader(colonnes de la config)` + `skipHeaderRecord(true)` : les colonnes sont lues **positionnellement** dans l'ordre de la config, le header du fichier est jeté. Un fichier avec les mêmes colonnes dans un autre ordre est importé silencieusement faux (prix ↔ stock permutés). La configurabilité des noms de colonnes (prérequis du lot 8b) ne fonctionne pas en l'état.
+- Fix : `setHeader()` sans argument (header inféré du fichier) + accès par nom configuré ; 400 explicite si une colonne requise manque.
+- Le champ `warnings` de `CsvImportResult` n'est jamais alimenté : l'alimenter ou le retirer.
+
+### Tests
+- `@WebMvcTest` : `GET /api/users/me` authentifié → 200 avec roles ; non authentifié → 401.
+- `CsvImportServiceImplTest` : colonnes dans un ordre différent de la config → import correct ; colonne requise absente du header → erreur explicite.
+- Test CORS (MockMvc) : preflight OPTIONS depuis une origine autorisée → headers CORS présents ; origine inconnue → refus.
+
+### Critères de validation
+- `./mvnw verify` vert.
+- Depuis le front lancé en local (`ng serve`), le login puis un `GET /api/clients` aboutissent sans erreur CORS — clôture du lot 0 front.
 
 ---
 
@@ -629,18 +703,27 @@ Standardiser le contrat HTTP, exposer une spec consommable par le front Angular,
 - `Quote.createdBy` → `@ManyToOne(optional = false)` (après lot 10/15).
 - Liquibase changeset correspondant (NOT NULL sur les colonnes FK).
 
-**5. Cohérence linguistique config**
-- `application.yaml` : renommer `facture-dir` → `invoice-dir`, `output-dir` reste, `"FACTURE"` (constante côté Java) → `"INVOICE"`.
-- Migration interne uniquement, pas de breaking change visible côté API.
+**5. Retrait du périmètre facturation** *(décision du 10/07/2026 : Kreadevis est un logiciel de devis, pas de facturation)*
+- Supprimer `GET /api/quotes/{id}/invoice/pdf` (`QuoteDocumentController`), `PdfService.generateInvoicePdf` et la variante `"FACTURE"` de `buildPdf`.
+- Supprimer la config `app.document.facture-dir` (+ variable `DOC_FACTURE_DIR`) de `application.yaml` et `AppProperties`.
+- Le PDF « facture » actuel était de toute façon non conforme (pas de numérotation séquentielle, pas de mentions obligatoires) : on supprime, on ne met pas en conformité.
+
+**6. Création client atomique** *(audit 10/07/2026)*
+- Le front doit aujourd'hui enchaîner `POST /api/addresses` puis `POST /api/clients` (`ClientRequest` exige un `addressId`) : adresse orpheline si le 2e appel échoue.
+- Accepter une adresse **imbriquée** dans `ClientRequest` (création/mise à jour du client et de son adresse en une seule transaction).
+- Retirer `AddressController` en ressource REST top-level si plus aucun usage (à synchroniser avec `ClientService` côté front).
 
 ### Tests
 - Vérifier dans les `@WebMvcTest` existants que `POST` renvoie 201 et `Location`.
 - Test smoke OpenAPI : `GET /v3/api-docs` retourne 200, JSON valide.
+- `ClientControllerTest` : création d'un client avec adresse imbriquée en un seul POST → 201, adresse persistée.
 
 ### Critères de validation
 - `./mvnw verify` vert.
 - `/swagger-ui.html` accessible en dev, désactivé en prod.
 - Aucun `@JsonIgnoreProperties` ne subsiste dans le package `entity`.
+- `git grep -i facture` à blanc dans `src/main`.
+- Créer un client (avec adresse) = un seul appel HTTP.
 
 ---
 
@@ -710,7 +793,7 @@ Appliquer les mesures de durcissement décrites en détail dans `security.md`. C
 
 ### Périmètre (résumé — détail et justification dans `security.md`)
 
-**1. CORS effectif** — Bean `CorsConfigurationSource` câblé sur `app.cors.allowed-origins`, méthodes/headers autorisés, `allowCredentials=true` côté front Angular.
+**1. Durcissement CORS** — le bean `CorsConfigurationSource` est posé dès le lot 12b (débloquage front) ; ici : restreindre méthodes/headers autorisés, `allowCredentials=true` côté front Angular, origines prod via variable d'environnement.
 
 **2. Fail-fast sur les secrets** — `@Validated @NotBlank` sur `JwtProperties.secret` et `DatasourceProperties`. Suppression des valeurs par défaut (`changeme-256-bit-secret-key`, `app1pass`). Création de `.env.example` à la racine, listage explicite des variables requises.
 
@@ -724,6 +807,12 @@ Appliquer les mesures de durcissement décrites en détail dans `security.md`. C
 
 **7. Mots de passe** — Renforcement de la politique (cf. `security.md` §5) : longueur min 12, vérif breach optionnelle (HIBP API), cost factor BCrypt explicite (12).
 
+**8. Externalisation de l'identité société** *(audit 10/07/2026)* — `app.company` (nom réel + SIREN) est committé en clair dans `application.yaml` : passer par variables d'environnement / config externe, valeurs neutres en fallback.
+
+**9. Nettoyage `SecurityConfig`** *(audit 10/07/2026)* — retirer le `permitAll` sur `/actuator/**` : le starter actuator n'est pas dans le pom (config morte aujourd'hui, exposition totale le jour où quelqu'un l'ajoute). Si actuator est introduit un jour, n'exposer publiquement que `/actuator/health`.
+
+**10. Identifiant canonique** *(audit 10/07/2026)* — le login se fait par `email` mais le subject JWT est le `login` : choisir un identifiant unique (proposé : `email`) et aligner `AuthServiceImpl`, `JwtUtils`, `UserDetailsServiceImpl`.
+
 ### Tests
 - Test du rate-limiter : 6 appels successifs login → 6e renvoie 429.
 - Test upload CSV oversized → 413, mauvais MIME → 400.
@@ -736,3 +825,17 @@ Appliquer les mesures de durcissement décrites en détail dans `security.md`. C
 - `git grep -i "changeme\|app1pass"` à blanc.
 - `.env.example` présent, listant chaque variable utilisée par l'app.
 - `security.md` reflète exactement ce qui a été implémenté (mettre à jour si écart).
+
+---
+
+## Questions ouvertes — décisions à acter
+
+*Constats de l'audit du 10/07/2026, à trancher par le propriétaire du produit avant les lots concernés.*
+
+**1. Format de la référence devis** — la doc (`CLAUDE.md`, mémoire projet) dit `DDMMYY-NNN`, mais le code génère `DDMMYY-{userId}-NNN` (séquence journalière **par utilisateur**, lot 6). Deux options :
+- (a) assumer le multi-utilisateurs : garder `DDMMYY-{userId}-NNN` et corriger la doc ;
+- (b) revenir à `DDMMYY-NNN` global : nécessite de repasser la séquence en globale par jour (le verrou pessimiste actuel porte sur les devis du user).
+
+À trancher au plus tard pendant le lot 12 (§4, cohérence référence ↔ date).
+
+**2. Rôle du stock produit** — `Product.stockQuantity` existe et est alimenté par l'import CSV, mais aucun mouvement de stock n'est déclenché par le cycle de vie du devis (le legacy ne le faisait pas non plus). Champ purement informatif à assumer tel quel, ou gestion de stock à spécifier dans un lot dédié ?

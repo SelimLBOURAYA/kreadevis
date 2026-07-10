@@ -21,8 +21,9 @@ touches application code — only harness and documentation files.
 
 | File | Role | Rule |
 |------|------|------|
-| `CLAUDE.md` | Conventions (the **how**) | Source of truth for conventions |
-| `AGENTS.md` | Mirror of `CLAUDE.md` | **Always byte-identical** to `CLAUDE.md` |
+| `CLAUDE.md` | Conventions (the **how**) + documents census | Source of truth for conventions |
+| `AGENTS.md` | Mirror of `CLAUDE.md` | **Always byte-identical** to `CLAUDE.md` (auto-synced by the `sync-claude-agents.sh` hook — verify, don't fight it) |
+| `CONVENTIONS.md` | Cross-cutting conventions | **Always byte-identical** to the master `~/.claude/coding-conventions.md` — never edited locally, only re-copied from the master |
 | `lots.md` | Scope, lots, contracts (the **what**) | Modified **only** with user approval (Status excepted) |
 | `README.md` | Presentation, startup | Aligned with the real stack |
 | `skill/*/SKILL.md` | Project skills | Versions, paths and rules consistent with `CLAUDE.md` |
@@ -30,6 +31,15 @@ touches application code — only harness and documentation files.
 > **Invariant `AGENTS.md = CLAUDE.md`**: any edit to one is replicated byte
 > for byte in the other. Verify with `cmp CLAUDE.md AGENTS.md` at the end —
 > the command must be silent.
+>
+> **Invariant `CONVENTIONS.md = ~/.claude/coding-conventions.md`**: verify
+> with `cmp CONVENTIONS.md ~/.claude/coding-conventions.md` — must be silent.
+> If it diverges, the master changed: re-copy it, never hand-edit the local
+> copy.
+>
+> **Invariant documents census**: every file in the table above, every
+> `skill/*/SKILL.md`, and every real `docs/audits/*.md` report must appear in
+> `CLAUDE.md`'s `## Project documents` section. Add missing entries as a fix.
 
 ## Workflow
 
