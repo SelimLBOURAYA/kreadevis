@@ -1,6 +1,12 @@
 # kreadevis-backend
 
-> Cross-cutting conventions (lot workflow, commits, branches, PRs, forbidden patterns, ask-before-doing, secrets, REST architecture, rich-domain, session startup, pre-commit gate, English-only docs) are loaded from `~/.claude/coding-conventions.md`. This file holds **only what is specific to kreadevis-backend**.
+> **READ `CONVENTIONS.md` FIRST** (same directory, right after this file) — it
+> contains the mandatory cross-cutting conventions (lot workflow, commits,
+> branches, PRs, forbidden patterns, ask-before-doing, secrets, REST
+> architecture, rich-domain, session startup, pre-commit gate, English-only
+> docs, documents census, `AGENTS.md` mirror rule). It is a versioned copy of
+> the master `~/.claude/coding-conventions.md`. This file holds **only what
+> is specific to kreadevis-backend**.
 
 ## Project
 Quote-authoring application — migration of the legacy `kreadevis` (Spring Boot 3 MVC + JSP) to a pure REST API consumed by a separate Angular frontend.
@@ -22,7 +28,7 @@ Quote-authoring application — migration of the legacy `kreadevis` (Spring Boot
 ## Language
 - Code, comments, identifiers: **English**
 - Commit messages: **English**
-- Internal docs (`lots.md`, PR descriptions): **French accepted**
+- Internal planning docs (`lots.md`): **French required** (global §11); PR descriptions: French accepted
 - Agent-facing instruction docs (`CLAUDE.md`, `AGENTS.md`, memory files): **English only** (global §11)
 
 ## Project-specific rules
@@ -92,3 +98,24 @@ docker compose up -d       # PostgreSQL 17 on :5432
 | `JWT_SECRET` | 3 | JWT signing key |
 | `MAILJET_API_KEY` | 10 | Mailjet API key (email reminders) |
 | `MAILJET_API_SECRET` | 10 | Mailjet API secret |
+
+## Project documents
+
+Every useful document of this project, kept current on every doc-touching change (harness-sync scope):
+
+| Document | Role |
+|---|---|
+| `CONVENTIONS.md` | Cross-cutting conventions — versioned copy of the master `~/.claude/coding-conventions.md` |
+| `CLAUDE.md` | This file — project-specific conventions, migration context, this census |
+| `AGENTS.md` | Byte-identical mirror of `CLAUDE.md` (auto-synced by the `sync-claude-agents.sh` hook) |
+| `lots.md` | Detailed migration lot specifications (French) |
+| `security.md` | Security posture and hardening notes |
+| `README.md` | Presentation, Quick start |
+| `HELP.md` | Spring Boot generated reference links |
+| `skill/sprint/SKILL.md` | Chain lots into a sprint |
+| `skill/lot-test/SKILL.md` | Test the current lot to the coverage gate |
+| `skill/lot-audit/SKILL.md` | Security/performance/architecture audit before ship |
+| `skill/lot-ship/SKILL.md` | Push + PR, gated on a passing audit |
+| `skill/harness-sync/SKILL.md` | Realign this harness with code reality |
+| `skill/dep-update/SKILL.md` | Maven dependency refresh |
+| `docs/audits/lot-XX.md` | Per-lot audit reports (one per shipped lot) |
