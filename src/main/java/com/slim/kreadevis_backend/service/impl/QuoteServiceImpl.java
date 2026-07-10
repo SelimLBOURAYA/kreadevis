@@ -83,7 +83,7 @@ public class QuoteServiceImpl implements QuoteService {
         quote.setDate(LocalDate.now());
         assignReferenceCode(quote);
         quote.setStatus(QuoteStatus.FINALIZED);
-        QuoteTotals.recompute(quote);
+        quote.recomputeTotals();
 
         return quoteMapper.toResponse(quoteRepository.save(quote));
     }

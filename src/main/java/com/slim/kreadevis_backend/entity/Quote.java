@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,4 +63,23 @@ public class Quote {
     @OneToMany(mappedBy = "quote", cascade = CascadeType.ALL)
     @Builder.Default
     private List<QuoteItem> items = new ArrayList<>();
+
+    private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
+
+    public void recomputeTotals() {
+        BigDecimal totalHt = BigDecimal.ZERO;
+        BigDecimal totalVat = BigDecimal.ZERO;
+        for (QuoteItem item : this.items) {
+            if (!item.isActive() || item.getTotalPrice() == null) continue;
+            totalHt = totalHt.add(item.getTotalPrice());
+            BigDecimal rate = item.getVatRate() != null ? item.getVatRate() : BigDecimal.ZERO;
+            BigDecimal vatForLine = item.getTotalPrice()
+                    .multiply(rate)
+                    .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+            totalVat = totalVat.add(vatForLine);
+        }
+        this.totalPriceHt = totalHt;
+        this.totalVat = totalVat;
+        this.totalPriceTtc = totalHt.add(totalVat);
+    }
 }

@@ -48,7 +48,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
 
         QuoteItem saved = quoteItemRepository.save(item);
         quote.getItems().add(saved);
-        QuoteTotals.recompute(quote);
+        quote.recomputeTotals();
         quoteRepository.save(quote);
 
         return quoteMapper.toItemResponse(saved);
@@ -70,7 +70,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         item.setTotalPrice(product.getUnitPrice().multiply(BigDecimal.valueOf(request.quantity())));
 
         QuoteItem saved = quoteItemRepository.save(item);
-        QuoteTotals.recompute(quote);
+        quote.recomputeTotals();
         quoteRepository.save(quote);
 
         return quoteMapper.toItemResponse(saved);
@@ -85,7 +85,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         item.setActive(false);
         quoteItemRepository.save(item);
 
-        QuoteTotals.recompute(quote);
+        quote.recomputeTotals();
         quoteRepository.save(quote);
     }
 
