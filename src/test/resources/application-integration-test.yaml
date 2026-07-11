@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:integrationdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+  liquibase:
+    enabled: false
+
+logging:
+  level:
+    com.slim: DEBUG
+
+app:
+  jwt:
+    secret: integration-test-secret-key-that-is-at-least-256-bits-long-for-hs256-algorithm
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 86400000
+  company:
+    name: "Test Company"
+    address: ""
+    phone: ""
+    email: ""
+    siren: "000000000"
+  document:
+    logo-path: classpath:static/logo.png
+    output-dir: /tmp/kreadevis-test/documents
+    facture-dir: /tmp/kreadevis-test/factures
+  cors:
+    allowed-origins: http://localhost:4200
+  csv:
+    import:
+      columns:
+        label: label
+        description: description
+        stock-quantity: stockQuantity
+        unit-price: unitPrice
+        vat-rate: vatRate
+        reference-code: referenceCode

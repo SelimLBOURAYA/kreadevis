@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
@@ -37,6 +38,7 @@ public class PdfServiceImpl implements PdfService {
     private final ResourceLoader resourceLoader;
 
     @Override
+    @Transactional(readOnly = true)
     public byte[] generateQuotePdf(Long quoteId) {
         Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
@@ -44,6 +46,7 @@ public class PdfServiceImpl implements PdfService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public byte[] generateInvoicePdf(Long quoteId) {
         Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
@@ -189,31 +192,39 @@ public class PdfServiceImpl implements PdfService {
     }
 
     private void addTotal(Document document, Quote quote) throws DocumentException {
+        Font normalFont = new Font(Font.HELVETICA, 10);
         Font boldFont = new Font(Font.HELVETICA, 11, Font.BOLD);
 
         PdfPTable totalTable = new PdfPTable(2);
         totalTable.setWidthPercentage(40);
         totalTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
-        PdfPCell labelCell = new PdfPCell(new Phrase("TOTAL HT", boldFont));
+        addTotalRow(totalTable, "Total HT", quote.getTotalPriceHt(), normalFont, true);
+        addTotalRow(totalTable, "TVA",      quote.getTotalVat(),     normalFont, false);
+        addTotalRow(totalTable, "TOTAL TTC", quote.getTotalPriceTtc(), boldFont, true);
+
+        document.add(totalTable);
+    }
+
+    private void addTotalRow(PdfPTable table, String label, java.math.BigDecimal amount, Font font, boolean topBorder) {
+        PdfPCell labelCell = new PdfPCell(new Phrase(label, font));
         labelCell.setHorizontalAlignment(Element.ALIGN_LEFT);
         labelCell.setPadding(5);
-        labelCell.setBorderWidthTop(1);
+        labelCell.setBorderWidthTop(topBorder ? 1 : 0);
         labelCell.setBorderWidthBottom(0);
         labelCell.setBorderWidthLeft(0);
         labelCell.setBorderWidthRight(0);
-        totalTable.addCell(labelCell);
+        table.addCell(labelCell);
 
-        PdfPCell valueCell = new PdfPCell(new Phrase(String.format("%.2f €", quote.getTotalPrice()), boldFont));
+        String formatted = amount != null ? String.format("%.2f €", amount) : "—";
+        PdfPCell valueCell = new PdfPCell(new Phrase(formatted, font));
         valueCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
         valueCell.setPadding(5);
-        valueCell.setBorderWidthTop(1);
+        valueCell.setBorderWidthTop(topBorder ? 1 : 0);
         valueCell.setBorderWidthBottom(0);
         valueCell.setBorderWidthLeft(0);
         valueCell.setBorderWidthRight(0);
-        totalTable.addCell(valueCell);
-
-        document.add(totalTable);
+        table.addCell(valueCell);
     }
 
     private void addHeaderCell(PdfPTable table, String text, Font font, Color bg) {

@@ -4,7 +4,6 @@ import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
 import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
-import com.slim.kreadevis_backend.entity.QuoteItem;
 import com.slim.kreadevis_backend.entity.QuoteStatus;
 import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
@@ -19,7 +18,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -36,22 +34,26 @@ public class QuoteServiceImpl implements QuoteService {
     private final QuoteMapper quoteMapper;
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate) {
         return quoteRepository.findByDateRange(startDate, endDate).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public QuoteResponse findById(Long id) {
         return quoteMapper.toResponse(quoteRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id)));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<QuoteResponse> findByClientId(Long clientId) {
         return quoteRepository.findByClientIdAndActiveTrue(clientId).stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public QuoteResponse findByReferenceCode(String referenceCode) {
         return quoteMapper.toResponse(quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
@@ -82,9 +84,10 @@ public class QuoteServiceImpl implements QuoteService {
             throw new IllegalStateException("Cannot finalize a cancelled quote");
         }
 
+        quote.setDate(LocalDate.now());
         assignReferenceCode(quote);
         quote.setStatus(QuoteStatus.FINALIZED);
-        quote.setTotalPrice(computeTotalPrice(quote));
+        quote.recomputeTotals();
 
         return quoteMapper.toResponse(quoteRepository.save(quote));
     }
@@ -118,6 +121,9 @@ public class QuoteServiceImpl implements QuoteService {
     public void delete(Long id) {
         Quote quote = quoteRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        if (quote.getStatus() == QuoteStatus.FINALIZED) {
+            throw new IllegalStateException("Cannot delete a finalized quote");
+        }
         quote.getItems().forEach(item -> item.setActive(false));
         quote.setActive(false);
         quoteRepository.save(quote);
@@ -129,12 +135,6 @@ public class QuoteServiceImpl implements QuoteService {
         int nextSequence = quoteRepository.findMaxDailySequenceByUserAndDate(currentUser.getId(), today) + 1;
         quote.setDailySequence(nextSequence);
         quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
-    }
-
-    private BigDecimal computeTotalPrice(Quote quote) {
-        return quote.getItems().stream()
-                .map(QuoteItem::getTotalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private User getCurrentUser() {

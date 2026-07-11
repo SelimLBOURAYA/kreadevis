@@ -11,7 +11,9 @@ public record QuoteResponse(
         Long id,
         String referenceCode,
         LocalDate date,
-        BigDecimal totalPrice,
+        BigDecimal totalPriceHt,
+        BigDecimal totalVat,
+        BigDecimal totalPriceTtc,
         QuoteStatus status,
         ClientResponse client,
         List<QuoteItemResponse> items

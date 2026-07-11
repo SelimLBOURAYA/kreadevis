@@ -174,6 +174,51 @@ class QuoteServiceImplTest {
     }
 
     @Test
+    void finalize_shouldRealignDateToToday_evenIfQuoteWasCreatedEarlier() throws Exception {
+        try (var mocks = setupSecurityContext()) {
+
+        Quote quote = new Quote();
+        quote.setStatus(QuoteStatus.DRAFT);
+        quote.setDate(LocalDate.of(2020, 1, 1));
+        quote.setItems(new ArrayList<>());
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findMaxDailySequenceByUserAndDate(42L, LocalDate.now())).thenReturn(0);
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(quoteMapper.toResponse(quote)).thenReturn(dummyResponse());
+
+        quoteService.finalize(1L);
+
+        assertThat(quote.getDate()).isEqualTo(LocalDate.now());
+        }
+    }
+
+    @Test
+    void finalize_shouldRecomputeTotalsWithVat() throws Exception {
+        try (var mocks = setupSecurityContext()) {
+
+        Quote quote = new Quote();
+        quote.setStatus(QuoteStatus.DRAFT);
+        QuoteItem item = QuoteItem.builder()
+                .active(true)
+                .unitPrice(new BigDecimal("100.00"))
+                .vatRate(new BigDecimal("20"))
+                .totalPrice(new BigDecimal("100.00"))
+                .build();
+        quote.setItems(new ArrayList<>(List.of(item)));
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findMaxDailySequenceByUserAndDate(42L, LocalDate.now())).thenReturn(0);
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(quoteMapper.toResponse(quote)).thenReturn(dummyResponse());
+
+        quoteService.finalize(1L);
+
+        assertThat(quote.getTotalPriceHt()).isEqualByComparingTo("100.00");
+        assertThat(quote.getTotalVat()).isEqualByComparingTo("20.00");
+        assertThat(quote.getTotalPriceTtc()).isEqualByComparingTo("120.00");
+        }
+    }
+
+    @Test
     void finalize_shouldThrow_whenAlreadyFinalized() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.FINALIZED);
@@ -270,6 +315,17 @@ class QuoteServiceImplTest {
     }
 
     @Test
+    void delete_shouldThrow_whenFinalized() {
+        Quote quote = new Quote();
+        quote.setStatus(QuoteStatus.FINALIZED);
+        when(quoteRepository.findById(1L)).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> quoteService.delete(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Cannot delete a finalized quote");
+    }
+
+    @Test
     void delete_shouldThrow_whenNotFound() {
         when(quoteRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -304,6 +360,8 @@ class QuoteServiceImplTest {
     }
 
     private QuoteResponse dummyResponse() {
-        return new QuoteResponse(1L, "REF", LocalDate.now(), BigDecimal.ZERO, QuoteStatus.DRAFT, null, List.of());
+        return new QuoteResponse(1L, "REF", LocalDate.now(),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                QuoteStatus.DRAFT, null, List.of());
     }
 }
