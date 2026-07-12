@@ -839,6 +839,26 @@ Appliquer les mesures de durcissement décrites en détail dans `security.md`. C
 
 ---
 
+## LOT 17 — Dockerisation & publication d'image ⬜
+
+**Branche :** `feat/lot-17-dockerization`
+
+### Objectif
+Conteneuriser le backend et publier l'image sur GitHub Container Registry (GHCR) à chaque merge sur `main`, pour préparer la mise en production pilotée par le repo transverse `deployment` (`~/ENV/projets/deployment`).
+
+### Périmètre
+- `Dockerfile` multi-stage à la racine : stage build `maven:3.9-eclipse-temurin-25` (jar), stage runtime `eclipse-temurin:25-jre-alpine`, utilisateur non-root, `EXPOSE 8080`, `HEALTHCHECK` sur l'endpoint de santé.
+- `docker-compose.yml` complété : service `app` construit depuis le Dockerfile, `depends_on` postgres healthy, env depuis `.env`.
+- Job CI `build-image` (sur `main` uniquement, après tests verts) : `docker buildx` multi-arch `linux/amd64` + `linux/arm64`, push `ghcr.io/selimlbouraya/kreadevis-backend` avec tags `latest` + SHA court, auth `GITHUB_TOKEN` (permission `packages: write`).
+- README : section Docker quick start.
+
+### Critères de validation
+- `docker compose up --build` monte app + postgres, API joignable sur `http://localhost:8080`.
+- Image publiée sur GHCR à chaque merge sur `main`.
+- Le déploiement runtime (compose de prod, secrets Vault, observabilité, exposition Cloudflare) relève du repo `deployment` — fiche d'exploitation `deployment/docs/projects/kreadevis.md` à tenir à jour.
+
+---
+
 ## Questions ouvertes — décisions à acter
 
 *Constats de l'audit du 10/07/2026, à trancher par le propriétaire du produit avant les lots concernés.*
