@@ -1,12 +1,14 @@
 # Lots de migration — kreadevis-backend
 
+> Suivi transverse : `deployment/ROADMAP.md`.
+
 ## Contexte
 
 Migration de `kreadevis` (Spring Boot 3.3.4 / MVC / JSP) vers `kreadevis-backend` (Spring Boot 4 / REST API pure / Angular frontend séparé).
 
 - Ancien projet : `/home/selim/ENV/projets/kreadevis/`
 - Nouveau projet : `/home/selim/ENV/projets/kreadevis-backend/`
-- Stack cible : Spring Boot 4.0.6, Java 25, PostgreSQL 17 (Docker), MapStruct, OpenPDF, JWT
+- Stack cible : Spring Boot 4.1.x (dernière stable — voir LOT SB41), Java 25, PostgreSQL 17 (Docker), MapStruct, OpenPDF, JWT
 
 **Périmètre produit** : Kreadevis est un logiciel de **devis** uniquement — la facturation est **hors périmètre** (décision du 10/07/2026). L'endpoint « facture » hérité du legacy (`GET /api/quotes/{id}/invoice/pdf`, config `facture-dir`) sera **supprimé** au lot 14, pas mis en conformité.
 
@@ -36,13 +38,16 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 11  | feat/lot-11-quote-email-send   | ⬜ à faire  | métier             |
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
 | 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
+| SB41 | chore/spring-boot-4-1         | ⬜ à faire  | infra              |
 | 12b | feat/lot-12b-front-unblock     | ⬜ à faire  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
+| 17  | feat/lot-17-dockerization      | ⬜ à faire  | infra              |
+| 18  | feat/lot-18-client-embedded-address | ⬜ optionnel | API           |
 
-**Ordonnancement des derniers lots** : le lot 10 (Liquibase) est posé en premier car toutes les évolutions de schéma des lots suivants doivent passer par des changesets versionnés. Les lots 12→14 traitent ensuite l'intégrité métier, la pagination et l'hygiène API. Les lots 15 et 16, à dominante sécurité, sont volontairement positionnés en fin de cycle pour tester les fonctionnalités métier sans buter sur des restrictions d'autorisation. Voir `security.md` pour la justification technique des lots 15-16.
+**Ordonnancement des derniers lots** : le lot 10 (Liquibase) est posé en premier car toutes les évolutions de schéma des lots suivants doivent passer par des changesets versionnés. Les lots 12→14 traitent ensuite l'intégrité métier, la pagination et l'hygiène API. Les lots 15 et 16, à dominante sécurité, sont volontairement positionnés en fin de cycle pour tester les fonctionnalités métier sans buter sur des restrictions d'autorisation. Voir `security.md` pour la justification technique des lots 15-16. Le lot **SB41** (migration Spring Boot 4.1.x) est positionné **avant le lot 12b**.
 
 **Audit du 10/07/2026** — un audit croisé back/front a confirmé (test à l'appui) un bug bloquant : `LazyInitializationException` sur **toutes les lectures de devis** (détail au lot 12, point 0). Il a aussi montré que l'intégration front↔back n'a **jamais** été exercée : aucun bean CORS côté back, lot 0 front non réalisé, lots front validés uniquement avec HTTP mocké. Conséquences sur le plan :
 - **lot 12 étendu** : fix transactionnel en tête de lot, appartenance item↔devis, garde de suppression, test d'intégration non transactionnel avec Liquibase actif ;
@@ -75,7 +80,7 @@ Réalisé :
 Réalisé :
 - Entités traduites FR → EN : `Devis→Quote`, `Reservation→QuoteItem`, `CompteurDevis→QuoteCounter→supprimé`, `Produit→Product`, `Professionnel→Professional`, `Adresse→Address`
 - Repositories Spring Data JPA pour chaque entité
-- `QuoteService` + `QuoteServiceImpl` : génération `DDMMYY-NNN` avec reset quotidien
+- `QuoteService` + `QuoteServiceImpl` : génération `DDMMYY-{userId}-NNN` avec reset quotidien par utilisateur
 - `dailySequence` intégré dans `Quote` (plus d'entité séparée)
 
 Problèmes connus (à corriger dans les lots suivants) :
@@ -208,6 +213,10 @@ Réalisé :
 
 ### Objectif
 Permettre l'import de produits en masse via un fichier CSV (migration du `CsvHelper` / `CsvService` legacy).
+
+> **Décision 2026-07-13 (question ouverte n°2)** : `Product.stockQuantity` est
+> **purement informatif** — alimenté par l'import CSV, aucun mouvement de stock
+> n'est déclenché par le cycle de vie du devis.
 
 ### Format CSV attendu
 ```
@@ -601,6 +610,25 @@ Corriger les divergences entre l'état stocké et l'état affiché des devis, et
 
 ---
 
+## LOT SB41 — Migration Spring Boot 4.1.x ⬜
+
+**Branche :** `chore/spring-boot-4-1`
+
+> Positionné **avant le lot 12b** dans l'ordonnancement.
+> Justification : Spring Boot 4.0 OSS est EOL le 2026-12-31.
+
+### Périmètre
+- Bump du parent `pom.xml` vers la **dernière 4.1.x stable** (vérifier via
+  recherche web au moment de l'exécution du lot).
+- Lecture des release notes 4.1.
+- `./mvnw verify` vert.
+- **Aucune autre modification.**
+
+### Critères de validation
+- `./mvnw verify` vert.
+
+---
+
 ## LOT 12b — Débloquage front : CORS, /users/me, correctif CSV ⬜
 
 **Branche :** `feat/lot-12b-front-unblock`
@@ -719,22 +747,18 @@ Standardiser le contrat HTTP, exposer une spec consommable par le front Angular,
 - Supprimer la config `app.document.facture-dir` (+ variable `DOC_FACTURE_DIR`) de `application.yaml` et `AppProperties`.
 - Le PDF « facture » actuel était de toute façon non conforme (pas de numérotation séquentielle, pas de mentions obligatoires) : on supprime, on ne met pas en conformité.
 
-**6. Création client atomique** *(audit 10/07/2026)*
-- Le front doit aujourd'hui enchaîner `POST /api/addresses` puis `POST /api/clients` (`ClientRequest` exige un `addressId`) : adresse orpheline si le 2e appel échoue.
-- Accepter une adresse **imbriquée** dans `ClientRequest` (création/mise à jour du client et de son adresse en une seule transaction).
-- Retirer `AddressController` en ressource REST top-level si plus aucun usage (à synchroniser avec `ClientService` côté front).
+> Le point « création client atomique » (ex-§6, audit 10/07/2026) est déplacé
+> au **LOT 18 — client-embedded-address**.
 
 ### Tests
 - Vérifier dans les `@WebMvcTest` existants que `POST` renvoie 201 et `Location`.
 - Test smoke OpenAPI : `GET /v3/api-docs` retourne 200, JSON valide.
-- `ClientControllerTest` : création d'un client avec adresse imbriquée en un seul POST → 201, adresse persistée.
 
 ### Critères de validation
 - `./mvnw verify` vert.
 - `/swagger-ui.html` accessible en dev, désactivé en prod.
 - Aucun `@JsonIgnoreProperties` ne subsiste dans le package `entity`.
 - `git grep -i facture` à blanc dans `src/main`.
-- Créer un client (avec adresse) = un seul appel HTTP.
 
 ---
 
@@ -849,7 +873,7 @@ Conteneuriser le backend et publier l'image sur GitHub Container Registry (GHCR)
 ### Périmètre
 - `Dockerfile` multi-stage à la racine : stage build `maven:3.9-eclipse-temurin-25` (jar), stage runtime `eclipse-temurin:25-jre-alpine`, utilisateur non-root, `EXPOSE 8080`, `HEALTHCHECK` sur l'endpoint de santé.
 - `docker-compose.yml` complété : service `app` construit depuis le Dockerfile, `depends_on` postgres healthy, env depuis `.env`.
-- Job CI `build-image` (sur `main` uniquement, après tests verts) : `docker buildx` multi-arch `linux/amd64` + `linux/arm64`, push `ghcr.io/selimlbouraya/kreadevis-backend` avec tags `latest` + SHA court, auth `GITHUB_TOKEN` (permission `packages: write`).
+- Job CI `build-image` (sur `main` uniquement, après tests verts) : `docker buildx` `linux/amd64` uniquement, push `ghcr.io/selimlbouraya/kreadevis-backend` avec tags `latest` + SHA court, auth `GITHUB_TOKEN` (permission `packages: write`).
 - README : section Docker quick start.
 
 ### Critères de validation
@@ -859,14 +883,38 @@ Conteneuriser le backend et publier l'image sur GitHub Container Registry (GHCR)
 
 ---
 
+## LOT 18 — Adresse client imbriquée (client-embedded-address) ⬜ (optionnel)
+
+**Branche :** `feat/lot-18-client-embedded-address`
+
+> Renuméroté **LOT 18** (décision 2026-07-13) : l'ancien numéro 17 entrait en
+> collision avec le LOT 17 — Dockerisation. Périmètre extrait du LOT 14 (ex-§6,
+> audit 10/07/2026). Pré-requis du lot front 14 (`client-single-call`).
+
+### Objectif
+Création client atomique : supprimer l'enchaînement `POST /api/addresses` puis
+`POST /api/clients` imposé au front.
+
+### Périmètre
+- Le front doit aujourd'hui enchaîner `POST /api/addresses` puis `POST /api/clients` (`ClientRequest` exige un `addressId`) : adresse orpheline si le 2e appel échoue.
+- Accepter une adresse **imbriquée** dans `ClientRequest` (création/mise à jour du client et de son adresse en une seule transaction).
+- Retirer `AddressController` en ressource REST top-level si plus aucun usage (à synchroniser avec `ClientService` côté front).
+
+### Tests
+- `ClientControllerTest` : création d'un client avec adresse imbriquée en un seul POST → 201, adresse persistée.
+
+### Critères de validation
+- `./mvnw verify` vert.
+- Créer un client (avec adresse) = un seul appel HTTP.
+
+---
+
 ## Questions ouvertes — décisions à acter
 
-*Constats de l'audit du 10/07/2026, à trancher par le propriétaire du produit avant les lots concernés.*
+*Constats de l'audit du 10/07/2026.*
 
-**1. Format de la référence devis** — la doc (`CLAUDE.md`, mémoire projet) dit `DDMMYY-NNN`, mais le code génère `DDMMYY-{userId}-NNN` (séquence journalière **par utilisateur**, lot 6). Deux options :
-- (a) assumer le multi-utilisateurs : garder `DDMMYY-{userId}-NNN` et corriger la doc ;
-- (b) revenir à `DDMMYY-NNN` global : nécessite de repasser la séquence en globale par jour (le verrou pessimiste actuel porte sur les devis du user).
+**1. Format de la référence devis** — la doc (`CLAUDE.md`, mémoire projet) disait `DDMMYY-NNN`, mais le code génère `DDMMYY-{userId}-NNN` (séquence journalière **par utilisateur**, lot 6).
+**Tranchée (2026-07-13) : option (a)** — la référence `DDMMYY-{userId}-NNN` est conservée, le multi-utilisateurs est assumé ; la doc est corrigée (`CLAUDE.md`, lot 6 ci-dessus).
 
-À trancher au plus tard pendant le lot 12 (§4, cohérence référence ↔ date).
-
-**2. Rôle du stock produit** — `Product.stockQuantity` existe et est alimenté par l'import CSV, mais aucun mouvement de stock n'est déclenché par le cycle de vie du devis (le legacy ne le faisait pas non plus). Champ purement informatif à assumer tel quel, ou gestion de stock à spécifier dans un lot dédié ?
+**2. Rôle du stock produit** — `Product.stockQuantity` existe et est alimenté par l'import CSV, mais aucun mouvement de stock n'est déclenché par le cycle de vie du devis (le legacy ne le faisait pas non plus).
+**Tranchée (2026-07-13) : option (a)** — champ purement informatif, assumé tel quel ; documenté au LOT 8.
