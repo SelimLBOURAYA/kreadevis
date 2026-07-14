@@ -89,7 +89,7 @@ docker compose up -d       # PostgreSQL 17 on :5432
 ## Migration context
 - Legacy project: `/home/selim/ENV/projets/kreadevis/` (mostly functional, main blocker on Spring Security)
 - View layer (JSP, JSTL, Servlets, Webjars) to be abandoned entirely
-- Quote reference format: `DDMMYY-NNN` with daily sequence
+- Quote reference format: `DDMMYY-{userId}-NNN` with per-user daily sequence (decision 2026-07-13, multi-user assumed)
 
 ## Secrets / environment
 | Variable | Lot | Usage |
