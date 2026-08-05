@@ -35,7 +35,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 8b  | feat/lot-8b-csv-profiles       | ⬜ à faire  | métier (optionnel) |
 | 9   | feat/lot-9-tests               | ✅ terminé  | qualité            |
 | 10  | chore/lot-10-liquibase         | ✅ terminé  | infra              |
-| 11  | feat/lot-11-quote-email-send   | ⬜ à faire  | métier             |
+| 11  | feat/lot-11-quote-email-send   | ✅ terminé  | métier             |
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
 | 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
 | SB41 | chore/spring-boot-4-1         | ✅ terminé  | infra              |
@@ -319,10 +319,25 @@ Points techniques Spring Boot 4 :
 
 ---
 
-## LOT 11 — Envoi du devis par email au client ⬜
+## LOT 11 — Envoi du devis par email au client ✅
 
-**Branche :** `feat/lot-11-quote-email-send`
-**Commit cible :** `feat(11): send quote pdf to client by email`
+**Branche :** `feat/lot-11-quote-email-send` — PR à ouvrir
+**Commits :**
+- `0ee7887 feat(11): add quote sent-tracking schema and thymeleaf dependency`
+- `8d6ee48 feat(11): send quote pdf to client by email via mailjet`
+- `a2b39f6 test(11): cover quote email send, mailjet client and send endpoint`
+- `a483de8 chore: add .env.example template and ignore .env`
+
+**Audit :** `docs/audits/lot-11.md` — 0 Critical, 2 Warning (appel externe dans la transaction, `/send` sans ownership → lot 15)
+
+**Fait :**
+- Colonnes `sent_at` / `sent_to` sur `Quote` (changeset Liquibase 003)
+- Intégration Mailjet v3.1 via `RestClient` (`EmailService` + `MailjetEmailServiceImpl`), abstraction provider-agnostique
+- `QuoteEmailService` : compose PDF (lot 7) + corps Thymeleaf + envoi, persiste la trace d'envoi
+- `POST /api/quotes/{id}/send` (`SendQuoteRequest` optionnel → `SendQuoteResponse`)
+- Kill switch `app.email.enabled` → 409 ; destinataire manquant → 422 (nouveau `UnprocessableEntityException`) ; échec provider → 502
+- Template `templates/email/quote.html` (autoescaping XSS), clés Mailjet en variables d'env sans défaut (§5), `.env.example` créé
+- 121 tests verts, JaCoCo gate OK
 
 ### Objectif
 Permettre au commerçant d'envoyer le devis (PDF généré au lot 7) directement par email au client en un clic, depuis l'app. Provider : **Mailjet via REST API** (pas de SMTP) en utilisant le `RestClient` Spring. Pose toute l'infra email partagée avec le lot 11b (scheduler optionnel).
