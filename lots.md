@@ -38,7 +38,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 11  | feat/lot-11-quote-email-send   | ⬜ à faire  | métier             |
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
 | 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
-| SB41 | chore/spring-boot-4-1         | ⬜ à faire  | infra              |
+| SB41 | chore/spring-boot-4-1         | ✅ terminé  | infra              |
 | 12b | feat/lot-12b-front-unblock     | ⬜ à faire  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
@@ -610,22 +610,19 @@ Corriger les divergences entre l'état stocké et l'état affiché des devis, et
 
 ---
 
-## LOT SB41 — Migration Spring Boot 4.1.x ⬜
+## LOT SB41 — Migration Spring Boot 4.1.x ✅
 
-**Branche :** `chore/spring-boot-4-1`
+**Branche :** `chore/spring-boot-4-1` — PR #20 mergée
+**Commit :** `03c04df chore(SB41): bump spring-boot-starter-parent from 4.0.6 to 4.1.0`
 
 > Positionné **avant le lot 12b** dans l'ordonnancement.
 > Justification : Spring Boot 4.0 OSS est EOL le 2026-12-31.
 
-### Périmètre
-- Bump du parent `pom.xml` vers la **dernière 4.1.x stable** (vérifier via
-  recherche web au moment de l'exécution du lot).
-- Lecture des release notes 4.1.
-- `./mvnw verify` vert.
-- **Aucune autre modification.**
-
-### Critères de validation
-- `./mvnw verify` vert.
+Réalisé :
+- Bump Spring Boot parent 4.0.6 → 4.1.0 (dernière stable, 2026-06-10)
+- Montées de version gérées : Spring Framework 7.0.8, Spring Security 7.1.0, Hibernate 7.4.1, Spring Data 2026.0.0
+- 106 tests verts, JaCoCo gate OK — aucun changement de code nécessaire
+- Audit : `docs/audits/lot-SB41.md` — 0 Critical, 0 Warning
 
 ---
 
