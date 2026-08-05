@@ -171,7 +171,7 @@ class CsvImportServiceImplTest {
     }
 
     @Test
-    void importProducts_throwsOnMissingRequiredColumn() {
+    void importProducts_throwsOnMissingExpectedColumn() {
         String csv = "label,description,stockQuantity,vatRate,referenceCode\n" +
                      "Robinet,Desc,5,20.0,REF-011\n";
         MockMultipartFile file = multipartFile(csv);
@@ -179,7 +179,7 @@ class CsvImportServiceImplTest {
         assertThatThrownBy(() -> csvImportService.importProducts(file))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unitPrice")
-                .hasMessageContaining("missing required columns");
+                .hasMessageContaining("missing expected columns");
     }
 
     @Test
