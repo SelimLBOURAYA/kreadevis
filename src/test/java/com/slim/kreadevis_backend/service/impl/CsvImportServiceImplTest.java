@@ -155,6 +155,34 @@ class CsvImportServiceImplTest {
     }
 
     @Test
+    void importProducts_handlesColumnsInDifferentOrder() {
+        String csv = "referenceCode,vatRate,unitPrice,label,stockQuantity,description\n" +
+                     "REF-010,10.0,75.0,Robinet,5,Desc different order\n";
+        MockMultipartFile file = multipartFile(csv);
+
+        when(productRepository.findByReferenceCodeAndActiveTrue("REF-010")).thenReturn(Optional.empty());
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productMapper.toResponse(any())).thenAnswer(inv -> null);
+
+        CsvImportResult result = csvImportService.importProducts(file);
+
+        assertThat(result.importedCount()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void importProducts_throwsOnMissingRequiredColumn() {
+        String csv = "label,description,stockQuantity,vatRate,referenceCode\n" +
+                     "Robinet,Desc,5,20.0,REF-011\n";
+        MockMultipartFile file = multipartFile(csv);
+
+        assertThatThrownBy(() -> csvImportService.importProducts(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unitPrice")
+                .hasMessageContaining("missing required columns");
+    }
+
+    @Test
     void importProducts_mixedValidAndInvalidRows() {
         String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
                      "Valid Product,Desc,10,50.0,20.0,REF-OK\n" +

@@ -9,6 +9,7 @@ import com.slim.kreadevis_backend.mapper.ProductMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.service.CsvImportService;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,12 +23,16 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class CsvImportServiceImpl implements CsvImportService {
 
     private static final Logger log = LoggerFactory.getLogger(CsvImportServiceImpl.class);
+
+    private static final Set<String> REQUIRED_COLUMNS = Set.of("label", "unitPrice", "vatRate");
 
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
@@ -41,8 +46,7 @@ public class CsvImportServiceImpl implements CsvImportService {
         this.productMapper = productMapper;
         this.columns = columns;
         this.csvFormat = CSVFormat.DEFAULT.builder()
-                .setHeader(columns.label(), columns.description(), columns.stockQuantity(),
-                           columns.unitPrice(), columns.vatRate(), columns.referenceCode())
+                .setHeader()
                 .setSkipHeaderRecord(true)
                 .setTrim(true)
                 .setIgnoreEmptyLines(true)
@@ -68,11 +72,14 @@ public class CsvImportServiceImpl implements CsvImportService {
     public CsvImportResult importProducts(MultipartFile file) {
         List<ProductResponse> imported = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
 
-        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)) {
-            Iterable<CSVRecord> records = csvFormat.parse(reader);
-            for (CSVRecord record : records) {
+        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = csvFormat.parse(reader)) {
+
+            Set<String> headerNames = new HashSet<>(parser.getHeaderNames());
+            validateRequiredColumns(headerNames);
+
+            for (CSVRecord record : parser) {
                 int lineNumber = (int) record.getRecordNumber() + 1;
                 processRecord(record, lineNumber, imported, errors);
             }
@@ -80,10 +87,20 @@ public class CsvImportServiceImpl implements CsvImportService {
             throw new IllegalArgumentException("Failed to read CSV file: " + e.getMessage(), e);
         }
 
-        log.info("CSV import completed: {} imported, {} errors, {} warnings",
-                imported.size(), errors.size(), warnings.size());
+        log.info("CSV import completed: {} imported, {} errors", imported.size(), errors.size());
 
-        return new CsvImportResult(imported.size(), imported, errors, warnings);
+        return new CsvImportResult(imported.size(), imported, errors, List.of());
+    }
+
+    private void validateRequiredColumns(Set<String> headerNames) {
+        List<String> missing = REQUIRED_COLUMNS.stream()
+                .filter(col -> !headerNames.contains(col))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "CSV missing required columns: " + String.join(", ", missing)
+                            + ". Header found: " + headerNames);
+        }
     }
 
     private void processRecord(CSVRecord record, int lineNumber,
@@ -101,34 +118,45 @@ public class CsvImportServiceImpl implements CsvImportService {
             return new ParseResult.Err(new RowError(lineNumber, "Missing required field: label"));
         }
 
-        Long stockQuantity;
-        try {
-            stockQuantity = Long.parseLong(record.get(columns.stockQuantity()));
-        } catch (NumberFormatException e) {
-            return new ParseResult.Err(new RowError(lineNumber, "Invalid stockQuantity: " + record.get(columns.stockQuantity())));
+        Long stockQuantity = 0L;
+        if (record.isMapped(columns.stockQuantity())) {
+            try {
+                String sq = record.get(columns.stockQuantity());
+                stockQuantity = sq.isBlank() ? 0L : Long.parseLong(sq);
+            } catch (NumberFormatException e) {
+                return new ParseResult.Err(new RowError(lineNumber,
+                        "Invalid stockQuantity: " + record.get(columns.stockQuantity())));
+            }
         }
 
         BigDecimal unitPrice;
         try {
             unitPrice = new BigDecimal(record.get(columns.unitPrice()));
         } catch (NumberFormatException e) {
-            return new ParseResult.Err(new RowError(lineNumber, "Invalid unitPrice: " + record.get(columns.unitPrice())));
+            return new ParseResult.Err(new RowError(lineNumber,
+                    "Invalid unitPrice: " + record.get(columns.unitPrice())));
         }
 
         BigDecimal vatRate;
         try {
             vatRate = new BigDecimal(record.get(columns.vatRate()));
         } catch (NumberFormatException e) {
-            return new ParseResult.Err(new RowError(lineNumber, "Invalid vatRate: " + record.get(columns.vatRate())));
+            return new ParseResult.Err(new RowError(lineNumber,
+                    "Invalid vatRate: " + record.get(columns.vatRate())));
         }
+
+        String description = record.isMapped(columns.description())
+                ? blankToNull(record.get(columns.description())) : null;
+        String referenceCode = record.isMapped(columns.referenceCode())
+                ? blankToNull(record.get(columns.referenceCode())) : null;
 
         return new ParseResult.Ok(new ProductRow(
                 label,
-                blankToNull(record.get(columns.description())),
+                description,
                 stockQuantity,
                 unitPrice,
                 vatRate,
-                blankToNull(record.get(columns.referenceCode()))
+                referenceCode
         ));
     }
 
