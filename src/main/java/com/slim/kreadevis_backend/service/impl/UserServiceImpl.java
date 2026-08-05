@@ -30,6 +30,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public UserResponse findByLogin(String login) {
+        return userMapper.toResponse(userRepository.findByLoginAndActiveTrue(login)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + login)));
+    }
+
+    @Override
     public void delete(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
