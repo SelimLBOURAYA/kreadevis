@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-baseline-schema.yaml
   - include:
       file: db/changelog/changes/002-quote-vat-totals.yaml
+  - include:
+      file: db/changelog/changes/003-add-quote-sent-tracking.yaml
