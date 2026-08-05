@@ -112,6 +112,7 @@ Every useful document of this project, kept current on every doc-touching change
 | `security.md` | Security posture and hardening notes |
 | `README.md` | Presentation, Quick start |
 | `HELP.md` | Spring Boot generated reference links |
+| `skill/i-have-adhd/SKILL.md` | enlight llm return |
 | `skill/sprint/SKILL.md` | Chain lots into a sprint |
 | `skill/lot-test/SKILL.md` | Test the current lot to the coverage gate |
 | `skill/lot-audit/SKILL.md` | Security/performance/architecture audit before ship |
