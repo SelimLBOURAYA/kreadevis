@@ -39,7 +39,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 11b | feat/lot-11b-email-reminders   | ⬜ optionnel | métier             |
 | 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
 | SB41 | chore/spring-boot-4-1         | ✅ terminé  | infra              |
-| 12b | feat/lot-12b-front-unblock     | ⬜ à faire  | correctifs / API   |
+| 12b | feat/lot-12b-front-unblock     | ✅ terminé  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
@@ -626,13 +626,22 @@ Réalisé :
 
 ---
 
-## LOT 12b — Débloquage front : CORS, /users/me, correctif CSV ⬜
+## LOT 12b — Débloquage front : CORS, /users/me, correctif CSV ✅
 
-**Branche :** `feat/lot-12b-front-unblock`
-**Commits cibles :**
-- `feat(12b): wire cors configuration source on app.cors.allowed-origins`
-- `feat(12b): expose GET /api/users/me with roles`
-- `fix(12b): honor csv file header order on product import`
+**Branche :** `feat/lot-12b-front-unblock` — mergée sur `main`
+**Commits :**
+- `b790389 feat(12b): wire cors configuration source on app.cors.allowed-origins`
+- `a3ba694 feat(12b): expose GET /api/users/me with roles`
+- `bf7315c fix(12b): honor csv file header order on product import`
+- `c1141fd fix(12b): validate all configured csv columns, not just hardcoded required ones`
+- `55f6b8f docs(12b): add audit report`
+
+**Audit :** `docs/audits/lot-12b.md`
+
+**Fait :**
+- Bean `CorsConfigurationSource` branché sur `app.cors.allowed-origins` + `.cors()` dans `SecurityConfig`
+- `GET /api/users/me` → `UserResponse` (id, login, email, roles) depuis le `SecurityContextHolder`
+- Import CSV : header inféré du fichier + accès par nom de colonne configuré, validation de toutes les colonnes configurées
 
 ### Objectif
 Lever les trois blocages identifiés à l'audit du 10/07/2026 qui empêchent le front Angular d'avancer (lots front 6→10). Peut être mené en parallèle du lot 12 (pas de fichier commun hors tests).
