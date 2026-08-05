@@ -32,8 +32,6 @@ public class CsvImportServiceImpl implements CsvImportService {
 
     private static final Logger log = LoggerFactory.getLogger(CsvImportServiceImpl.class);
 
-    private static final Set<String> REQUIRED_COLUMNS = Set.of("label", "unitPrice", "vatRate");
-
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final CsvImportColumns columns;
@@ -77,7 +75,7 @@ public class CsvImportServiceImpl implements CsvImportService {
              CSVParser parser = csvFormat.parse(reader)) {
 
             Set<String> headerNames = new HashSet<>(parser.getHeaderNames());
-            validateRequiredColumns(headerNames);
+            validateColumns(headerNames);
 
             for (CSVRecord record : parser) {
                 int lineNumber = (int) record.getRecordNumber() + 1;
@@ -92,13 +90,16 @@ public class CsvImportServiceImpl implements CsvImportService {
         return new CsvImportResult(imported.size(), imported, errors, List.of());
     }
 
-    private void validateRequiredColumns(Set<String> headerNames) {
-        List<String> missing = REQUIRED_COLUMNS.stream()
+    private void validateColumns(Set<String> headerNames) {
+        List<String> expected = List.of(
+                columns.label(), columns.description(), columns.stockQuantity(),
+                columns.unitPrice(), columns.vatRate(), columns.referenceCode());
+        List<String> missing = expected.stream()
                 .filter(col -> !headerNames.contains(col))
                 .toList();
         if (!missing.isEmpty()) {
             throw new IllegalArgumentException(
-                    "CSV missing required columns: " + String.join(", ", missing)
+                    "CSV missing expected columns: " + String.join(", ", missing)
                             + ". Header found: " + headerNames);
         }
     }
@@ -119,13 +120,13 @@ public class CsvImportServiceImpl implements CsvImportService {
         }
 
         Long stockQuantity = 0L;
-        if (record.isMapped(columns.stockQuantity())) {
+        String sq = record.get(columns.stockQuantity());
+        if (!sq.isBlank()) {
             try {
-                String sq = record.get(columns.stockQuantity());
-                stockQuantity = sq.isBlank() ? 0L : Long.parseLong(sq);
+                stockQuantity = Long.parseLong(sq);
             } catch (NumberFormatException e) {
                 return new ParseResult.Err(new RowError(lineNumber,
-                        "Invalid stockQuantity: " + record.get(columns.stockQuantity())));
+                        "Invalid stockQuantity: " + sq));
             }
         }
 
@@ -145,10 +146,8 @@ public class CsvImportServiceImpl implements CsvImportService {
                     "Invalid vatRate: " + record.get(columns.vatRate())));
         }
 
-        String description = record.isMapped(columns.description())
-                ? blankToNull(record.get(columns.description())) : null;
-        String referenceCode = record.isMapped(columns.referenceCode())
-                ? blankToNull(record.get(columns.referenceCode())) : null;
+        String description = blankToNull(record.get(columns.description()));
+        String referenceCode = blankToNull(record.get(columns.referenceCode()));
 
         return new ParseResult.Ok(new ProductRow(
                 label,
