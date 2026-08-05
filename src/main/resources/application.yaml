@@ -34,6 +34,15 @@ app:
     facture-dir: ${DOC_FACTURE_DIR:/tmp/kreadevis/factures}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+  email:
+    enabled: ${EMAIL_ENABLED:true}
+    mailjet:
+      api-url: ${MAILJET_API_URL:https://api.mailjet.com/v3.1/send}
+      api-key: ${MAILJET_API_KEY}
+      api-secret: ${MAILJET_API_SECRET}
+    sender:
+      email: ${EMAIL_SENDER_ADDRESS:noreply@kreadevis.fr}
+      name: ${EMAIL_SENDER_NAME:Kreadevis}
   csv:
     import:
       columns:
