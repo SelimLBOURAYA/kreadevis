@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Votre devis</title>
+</head>
+<body style="font-family: Arial, Helvetica, sans-serif; color: #222; line-height: 1.5;">
+    <p>Bonjour <span th:text="${clientName}">Client</span>,</p>
+
+    <p>
+        Veuillez trouver ci-joint votre devis
+        <span th:if="${referenceCode}">
+            (référence <strong th:text="${referenceCode}">REF</strong>)
+        </span>
+        au format PDF.
+    </p>
+
+    <p th:if="${customMessage}" th:text="${customMessage}"
+       style="white-space: pre-line; padding: 12px; background: #f4f4f4; border-radius: 4px;">
+        Message personnalisé
+    </p>
+
+    <p>Pour toute question, n'hésitez pas à nous répondre directement.</p>
+
+    <p>
+        Cordialement,<br/>
+        <strong th:text="${merchantName}">Commerçant</strong>
+    </p>
+</body>
+</html>

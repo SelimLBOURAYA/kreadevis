@@ -15,3 +15,12 @@ app:
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long-for-hs256-signing-algorithm
     expiration-ms: 3600000
+  email:
+    enabled: true
+    mailjet:
+      api-url: https://api.mailjet.com/v3.1/send
+      api-key: test-mailjet-key
+      api-secret: test-mailjet-secret
+    sender:
+      email: noreply@test.local
+      name: Kreadevis Test

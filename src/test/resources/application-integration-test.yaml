@@ -32,6 +32,15 @@ app:
     facture-dir: /tmp/kreadevis-test/factures
   cors:
     allowed-origins: http://localhost:4200
+  email:
+    enabled: true
+    mailjet:
+      api-url: https://api.mailjet.com/v3.1/send
+      api-key: test-mailjet-key
+      api-secret: test-mailjet-secret
+    sender:
+      email: noreply@test.local
+      name: Kreadevis Test
   csv:
     import:
       columns:
