@@ -1,0 +1,15 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 003-add-quote-sent-tracking
+      author: kreadevis
+      changes:
+        - addColumn:
+            tableName: quotes
+            columns:
+              - column:
+                  name: sent_at
+                  type: TIMESTAMP
+              - column:
+                  name: sent_to
+                  type: VARCHAR(255)
