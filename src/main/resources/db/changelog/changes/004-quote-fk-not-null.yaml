@@ -1,0 +1,19 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 004-quote-client-not-null
+      author: kreadevis
+      changes:
+        - addNotNullConstraint:
+            tableName: quotes
+            columnName: client_id
+            columnDataType: BIGINT
+
+  - changeSet:
+      id: 004-quote-created-by-not-null
+      author: kreadevis
+      changes:
+        - addNotNullConstraint:
+            tableName: quotes
+            columnName: created_by
+            columnDataType: BIGINT

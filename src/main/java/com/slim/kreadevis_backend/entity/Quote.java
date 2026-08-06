@@ -1,6 +1,5 @@
 package com.slim.kreadevis_backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -49,15 +48,14 @@ public class Quote {
     @Builder.Default
     private QuoteStatus status = QuoteStatus.DRAFT;
 
-    @ManyToOne
-    @JsonIgnoreProperties("quotes")
+    @ManyToOne(optional = false)
     private Client client;
 
     @Builder.Default
     @Column(columnDefinition = "boolean default true")
     private boolean active = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by")
     private User createdBy;
 

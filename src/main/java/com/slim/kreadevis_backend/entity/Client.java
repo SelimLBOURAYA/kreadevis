@@ -1,6 +1,5 @@
 package com.slim.kreadevis_backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -37,7 +36,6 @@ public class Client {
     private String vatCode;
 
     @ManyToOne(optional = false)
-    @JsonIgnoreProperties("clients")
     private Address address;
 
     @Column(name = "phone")
@@ -51,6 +49,5 @@ public class Client {
     private boolean active = true;
 
     @OneToMany(mappedBy = "client")
-    @JsonIgnoreProperties("client")
     private Set<Quote> quotes = new HashSet<>();
 }
