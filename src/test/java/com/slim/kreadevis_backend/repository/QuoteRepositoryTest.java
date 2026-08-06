@@ -99,12 +99,27 @@ class QuoteRepositoryTest {
     }
 
     private Quote persistQuote(User user, LocalDate date, int sequence) {
-        Client client = persistClient();
+        Client client = persistClient(user);
         return em.persist(Quote.builder().client(client).createdBy(user).date(date).dailySequence(sequence).build());
     }
 
-    private Client persistClient() {
+    private Client persistClient(User owner) {
         Address address = em.persist(Address.builder().street("1 rue Test").city("Paris").build());
-        return em.persist(Client.builder().lastName("Doe").address(address).build());
+        return em.persist(Client.builder().lastName("Doe").address(address).createdBy(owner).build());
+    }
+
+    // --- findByFiltersForOwner ---
+
+    @Test
+    void findByFiltersForOwner_shouldOnlyReturnQuotesOfGivenOwner() {
+        User owner = persistUser("heidi", "heidi@test.com");
+        User other = persistUser("ivan", "ivan@test.com");
+        persistQuote(owner, LocalDate.of(2026, 1, 10), 1);
+        persistQuote(other, LocalDate.of(2026, 1, 11), 1);
+
+        Page<Quote> result = quoteRepository.findByFiltersForOwner(owner.getId(), null, null, null, Pageable.unpaged());
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).getCreatedBy().getId()).isEqualTo(owner.getId());
     }
 }

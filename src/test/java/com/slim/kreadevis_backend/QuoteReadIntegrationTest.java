@@ -92,6 +92,7 @@ class QuoteReadIntegrationTest {
         client.setLastName("Dupont");
         client.setEmail("dupont@test.com");
         client.setAddress(address);
+        client.setCreatedBy(user);
         clientRepository.saveAndFlush(client);
 
         // 4. Create product
@@ -101,6 +102,7 @@ class QuoteReadIntegrationTest {
                 .vatRate(new BigDecimal("20"))
                 .stockQuantity(10L)
                 .referenceCode("TEST-001")
+                .createdBy(user)
                 .build();
         productRepository.saveAndFlush(product);
 

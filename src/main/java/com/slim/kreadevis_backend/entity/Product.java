@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = "supplier")
+@ToString(exclude = {"supplier", "createdBy"})
 public class Product {
 
     @Id
@@ -43,4 +43,8 @@ public class Product {
     @Builder.Default
     @Column(columnDefinition = "boolean default true")
     private boolean active = true;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 }
