@@ -16,5 +16,12 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
             + "OR LOWER(c.company) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Client> search(@Param("search") String search, Pageable pageable);
 
+    @Query("SELECT c FROM Client c WHERE c.active = true AND c.createdBy.id = :ownerId "
+            + "AND (:search IS NULL OR LOWER(c.lastName) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(c.company) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Client> searchByOwner(@Param("search") String search, @Param("ownerId") Long ownerId, Pageable pageable);
+
     Optional<Client> findByIdAndActiveTrue(Long id);
+
+    Optional<Client> findByIdAndActiveTrueAndCreatedById(Long id, Long ownerId);
 }

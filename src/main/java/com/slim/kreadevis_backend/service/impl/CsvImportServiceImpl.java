@@ -5,8 +5,10 @@ import com.slim.kreadevis_backend.dto.product.CsvImportResult;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult.RowError;
 import com.slim.kreadevis_backend.dto.product.ProductResponse;
 import com.slim.kreadevis_backend.entity.Product;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.ProductMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.CsvImportService;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -25,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -35,14 +38,17 @@ public class CsvImportServiceImpl implements CsvImportService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final CsvImportColumns columns;
+    private final SecurityUtils securityUtils;
     private final CSVFormat csvFormat;
 
     public CsvImportServiceImpl(ProductRepository productRepository,
                                 ProductMapper productMapper,
-                                CsvImportColumns columns) {
+                                CsvImportColumns columns,
+                                SecurityUtils securityUtils) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.columns = columns;
+        this.securityUtils = securityUtils;
         this.csvFormat = CSVFormat.DEFAULT.builder()
                 .setHeader()
                 .setSkipHeaderRecord(true)
@@ -160,9 +166,10 @@ public class CsvImportServiceImpl implements CsvImportService {
     }
 
     private void persistOrUpdate(ProductRow row, List<ProductResponse> imported) {
+        User currentUser = securityUtils.getCurrentUser();
         Product product;
         if (row.referenceCode() != null) {
-            product = productRepository.findByReferenceCodeAndActiveTrue(row.referenceCode())
+            product = findOwnedByReferenceCode(row.referenceCode(), currentUser)
                     .map(existing -> {
                         existing.setLabel(row.label());
                         existing.setDescription(row.description());
@@ -171,15 +178,24 @@ public class CsvImportServiceImpl implements CsvImportService {
                         existing.setVatRate(row.vatRate());
                         return existing;
                     })
-                    .orElseGet(() -> toEntity(row));
+                    .orElseGet(() -> toEntity(row, currentUser));
         } else {
-            product = toEntity(row);
+            product = toEntity(row, currentUser);
         }
         Product saved = productRepository.save(product);
         imported.add(productMapper.toResponse(saved));
     }
 
-    private Product toEntity(ProductRow row) {
+    /** Admins can update any product by reference code; a regular user can only update their own (a matching code owned by someone else is treated as new). */
+    private Optional<Product> findOwnedByReferenceCode(String referenceCode, User currentUser) {
+        Optional<Product> existing = productRepository.findByReferenceCodeAndActiveTrue(referenceCode);
+        if (existing.isEmpty() || securityUtils.isAdmin()) {
+            return existing;
+        }
+        return existing.filter(product -> product.getCreatedBy().getId().equals(currentUser.getId()));
+    }
+
+    private Product toEntity(ProductRow row, User currentUser) {
         return Product.builder()
                 .label(row.label())
                 .description(row.description())
@@ -187,6 +203,7 @@ public class CsvImportServiceImpl implements CsvImportService {
                 .unitPrice(row.unitPrice())
                 .vatRate(row.vatRate())
                 .referenceCode(row.referenceCode())
+                .createdBy(currentUser)
                 .build();
     }
 

@@ -3,11 +3,14 @@ package com.slim.kreadevis_backend.service.impl;
 import com.slim.kreadevis_backend.config.CsvImportColumns;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult;
 import com.slim.kreadevis_backend.entity.Product;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.ProductMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -22,10 +25,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CsvImportServiceImplTest {
 
+    private static final Long OWNER_ID = 42L;
+
     @Mock
     private ProductRepository productRepository;
     @Mock
     private ProductMapper productMapper;
+    @Mock
+    private SecurityUtils securityUtils;
 
     private CsvImportServiceImpl csvImportService;
 
@@ -33,7 +40,12 @@ class CsvImportServiceImplTest {
     void setUp() {
         CsvImportColumns defaultColumns = new CsvImportColumns(
                 "label", "description", "stockQuantity", "unitPrice", "vatRate", "referenceCode");
-        csvImportService = new CsvImportServiceImpl(productRepository, productMapper, defaultColumns);
+        csvImportService = new CsvImportServiceImpl(productRepository, productMapper, defaultColumns, securityUtils);
+
+        User currentUser = new User();
+        currentUser.setId(OWNER_ID);
+        lenient().when(securityUtils.isAdmin()).thenReturn(false);
+        lenient().when(securityUtils.getCurrentUser()).thenReturn(currentUser);
     }
 
     @Test
@@ -111,7 +123,10 @@ class CsvImportServiceImplTest {
                      "Updated Name,New Desc,10,99.0,20.0,EXISTING\n";
         MockMultipartFile file = multipartFile(csv);
 
+        User owner = new User();
+        owner.setId(OWNER_ID);
         Product existing = new Product();
+        existing.setCreatedBy(owner);
         when(productRepository.findByReferenceCodeAndActiveTrue("EXISTING")).thenReturn(Optional.of(existing));
         when(productRepository.save(existing)).thenReturn(existing);
         when(productMapper.toResponse(existing)).thenAnswer(inv -> null);
@@ -123,6 +138,32 @@ class CsvImportServiceImplTest {
         verify(productRepository).save(existing);
         assertThat(existing.getLabel()).isEqualTo("Updated Name");
         assertThat(existing.getDescription()).isEqualTo("New Desc");
+    }
+
+    @Test
+    void importProducts_createsNewProduct_whenReferenceCodeOwnedByAnotherUser() {
+        String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
+                     "New Owner Product,Desc,10,99.0,20.0,SHARED-REF\n";
+        MockMultipartFile file = multipartFile(csv);
+
+        User anotherUser = new User();
+        anotherUser.setId(99L);
+        Product ownedByAnotherUser = new Product();
+        ownedByAnotherUser.setCreatedBy(anotherUser);
+        when(productRepository.findByReferenceCodeAndActiveTrue("SHARED-REF")).thenReturn(Optional.of(ownedByAnotherUser));
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productMapper.toResponse(any())).thenAnswer(inv -> null);
+
+        CsvImportResult result = csvImportService.importProducts(file);
+
+        assertThat(result.importedCount()).isEqualTo(1);
+        assertThat(result.errors()).isEmpty();
+        // must not have mutated the other user's product
+        assertThat(ownedByAnotherUser.getLabel()).isNull();
+        ArgumentCaptor<Product> savedCaptor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(savedCaptor.capture());
+        assertThat(savedCaptor.getValue()).isNotSameAs(ownedByAnotherUser);
+        assertThat(savedCaptor.getValue().getCreatedBy().getId()).isEqualTo(OWNER_ID);
     }
 
     @Test

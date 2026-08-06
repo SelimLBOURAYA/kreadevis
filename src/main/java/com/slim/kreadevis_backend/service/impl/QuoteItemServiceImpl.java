@@ -10,6 +10,7 @@ import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.repository.QuoteItemRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.QuoteItemService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     private final QuoteItemRepository quoteItemRepository;
     private final ProductRepository productRepository;
     private final QuoteMapper quoteMapper;
+    private final SecurityUtils securityUtils;
 
     @Override
     @Transactional
@@ -96,8 +98,11 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     }
 
     private Quote loadModifiableQuote(Long quoteId) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.isAdmin()
+                ? quoteRepository.findByIdAndActiveTrue(quoteId)
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
+                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
         if (LOCKED_STATUSES.contains(quote.getStatus())) {
             throw new IllegalStateException(
                     "Cannot modify items of a quote with status " + quote.getStatus());
