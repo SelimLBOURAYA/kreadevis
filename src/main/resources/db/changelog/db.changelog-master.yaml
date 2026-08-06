@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/changes/002-quote-vat-totals.yaml
   - include:
       file: db/changelog/changes/003-add-quote-sent-tracking.yaml
+  - include:
+      file: db/changelog/changes/004-quote-fk-not-null.yaml

@@ -1,5 +1,7 @@
 package com.slim.kreadevis_backend.repository;
 
+import com.slim.kreadevis_backend.entity.Address;
+import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.entity.User;
 import org.junit.jupiter.api.Test;
@@ -97,6 +99,12 @@ class QuoteRepositoryTest {
     }
 
     private Quote persistQuote(User user, LocalDate date, int sequence) {
-        return em.persist(Quote.builder().createdBy(user).date(date).dailySequence(sequence).build());
+        Client client = persistClient();
+        return em.persist(Quote.builder().client(client).createdBy(user).date(date).dailySequence(sequence).build());
+    }
+
+    private Client persistClient() {
+        Address address = em.persist(Address.builder().street("1 rue Test").city("Paris").build());
+        return em.persist(Client.builder().lastName("Doe").address(address).build());
     }
 }

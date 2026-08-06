@@ -1,6 +1,5 @@
 package com.slim.kreadevis_backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -33,11 +32,9 @@ public class QuoteItem {
     private BigDecimal totalPrice;
 
     @ManyToOne
-    @JsonIgnoreProperties("items")
     private Product product;
 
     @ManyToOne
-    @JsonIgnoreProperties("items")
     private Quote quote;
 
     @Builder.Default
