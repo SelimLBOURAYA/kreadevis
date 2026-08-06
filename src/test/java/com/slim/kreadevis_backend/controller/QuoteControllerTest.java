@@ -18,6 +18,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.MockMvcBuilderCustomiz
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -33,6 +34,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -69,13 +72,23 @@ class QuoteControllerTest {
 
     @Test
     @WithMockUser
-    void getAll_shouldReturn200WithList() throws Exception {
-        when(quoteService.findAll(null, null)).thenReturn(List.of(dummyResponse()));
+    void getAll_shouldReturn200WithPage() throws Exception {
+        when(quoteService.findAll(isNull(), isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
 
         mockMvc.perform(get("/api/quotes"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].referenceCode").value("REF-001"))
-                .andExpect(jsonPath("$[0].status").value("DRAFT"));
+                .andExpect(jsonPath("$.content[0].referenceCode").value("REF-001"))
+                .andExpect(jsonPath("$.content[0].status").value("DRAFT"));
+    }
+
+    @Test
+    @WithMockUser
+    void getAll_shouldForwardStatusFilter() throws Exception {
+        when(quoteService.findAll(eq(QuoteStatus.FINALIZED), isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
+
+        mockMvc.perform(get("/api/quotes").param("status", "FINALIZED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].referenceCode").value("REF-001"));
     }
 
     @Test

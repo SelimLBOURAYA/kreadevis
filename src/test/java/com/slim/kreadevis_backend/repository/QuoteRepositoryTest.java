@@ -6,10 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDate;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,27 +56,40 @@ class QuoteRepositoryTest {
     }
 
     @Test
-    void findByDateRange_shouldReturnActiveQuotesWithinRange() {
+    void findByFilters_shouldReturnActiveQuotesWithinRange() {
         User user = persistUser("eve", "eve@test.com");
         persistQuote(user, LocalDate.of(2026, 1, 10), 1);
         persistQuote(user, LocalDate.of(2026, 1, 20), 2);
         persistQuote(user, LocalDate.of(2026, 2, 5), 3);
 
-        List<Quote> result = quoteRepository.findByDateRange(
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31));
+        Page<Quote> result = quoteRepository.findByFilters(null,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), Pageable.unpaged());
 
-        assertThat(result).hasSize(2);
+        assertThat(result.getContent()).hasSize(2);
     }
 
     @Test
-    void findByDateRange_shouldReturnAll_whenBothDatesNull() {
+    void findByFilters_shouldReturnAll_whenNoFilters() {
         User user = persistUser("frank", "frank@test.com");
         persistQuote(user, LocalDate.of(2026, 1, 1), 1);
         persistQuote(user, LocalDate.of(2026, 6, 1), 2);
 
-        List<Quote> result = quoteRepository.findByDateRange(null, null);
+        Page<Quote> result = quoteRepository.findByFilters(null, null, null, Pageable.unpaged());
 
-        assertThat(result).hasSize(2);
+        assertThat(result.getContent()).hasSize(2);
+    }
+
+    @Test
+    void findByFilters_shouldRespectPageSize() {
+        User user = persistUser("grace", "grace@test.com");
+        persistQuote(user, LocalDate.of(2026, 1, 1), 1);
+        persistQuote(user, LocalDate.of(2026, 1, 2), 2);
+        persistQuote(user, LocalDate.of(2026, 1, 3), 3);
+
+        Page<Quote> result = quoteRepository.findByFilters(null, null, null, PageRequest.of(0, 2));
+
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getTotalElements()).isEqualTo(3);
     }
 
     private User persistUser(String login, String email) {
