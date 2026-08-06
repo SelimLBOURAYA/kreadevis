@@ -9,6 +9,7 @@ import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.exception.UnprocessableEntityException;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.EmailService;
 import com.slim.kreadevis_backend.service.PdfService;
 import com.slim.kreadevis_backend.service.QuoteEmailService;
@@ -33,17 +34,20 @@ public class QuoteEmailServiceImpl implements QuoteEmailService {
     private final EmailService emailService;
     private final EmailProperties emailProperties;
     private final SpringTemplateEngine templateEngine;
+    private final SecurityUtils securityUtils;
 
     public QuoteEmailServiceImpl(QuoteRepository quoteRepository,
                                  PdfService pdfService,
                                  EmailService emailService,
                                  EmailProperties emailProperties,
-                                 SpringTemplateEngine templateEngine) {
+                                 SpringTemplateEngine templateEngine,
+                                 SecurityUtils securityUtils) {
         this.quoteRepository = quoteRepository;
         this.pdfService = pdfService;
         this.emailService = emailService;
         this.emailProperties = emailProperties;
         this.templateEngine = templateEngine;
+        this.securityUtils = securityUtils;
     }
 
     @Override
@@ -53,8 +57,11 @@ public class QuoteEmailServiceImpl implements QuoteEmailService {
             throw new IllegalStateException("Email sending is disabled");
         }
 
-        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.isAdmin()
+                ? quoteRepository.findByIdAndActiveTrue(quoteId)
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
+                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
 
         String recipient = resolveRecipient(quote, request);
 

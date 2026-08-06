@@ -3,6 +3,7 @@ package com.slim.kreadevis_backend.service.impl;
 import com.slim.kreadevis_backend.config.AppProperties;
 import com.slim.kreadevis_backend.entity.*;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,12 +25,16 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PdfServiceImplTest {
 
+    private static final Long OWNER_ID = 42L;
+
     @Mock
     private QuoteRepository quoteRepository;
     @Mock
     private ResourceLoader resourceLoader;
     @Mock
     private Resource logoResource;
+    @Mock
+    private SecurityUtils securityUtils;
 
     private PdfServiceImpl pdfService;
 
@@ -40,12 +45,17 @@ class PdfServiceImplTest {
         AppProperties.DocumentConfig doc = new AppProperties.DocumentConfig(
                 "classpath:static/logo.png", "/tmp/test");
         AppProperties props = new AppProperties(company, doc);
-        pdfService = new PdfServiceImpl(quoteRepository, props, resourceLoader);
+        pdfService = new PdfServiceImpl(quoteRepository, props, resourceLoader, securityUtils);
+
+        User currentUser = new User();
+        currentUser.setId(OWNER_ID);
+        lenient().when(securityUtils.isAdmin()).thenReturn(false);
+        lenient().when(securityUtils.getCurrentUser()).thenReturn(currentUser);
     }
 
     @Test
     void generateQuotePdf_returnsNonEmptyBytes() {
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(buildSampleQuote()));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(buildSampleQuote()));
         when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
         when(logoResource.exists()).thenReturn(false);
 
@@ -56,7 +66,7 @@ class PdfServiceImplTest {
 
     @Test
     void generateQuotePdf_throwsWhenQuoteNotFound() {
-        when(quoteRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> pdfService.generateQuotePdf(99L))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -64,8 +74,29 @@ class PdfServiceImplTest {
     }
 
     @Test
-    void generateQuotePdf_worksWithoutLogo() throws IOException {
+    void generateQuotePdf_throws404_whenQuoteOwnedByAnotherUser() {
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> pdfService.generateQuotePdf(1L))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void generateQuotePdf_bypassesOwnership_whenAdmin() {
+        when(securityUtils.isAdmin()).thenReturn(true);
         when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(buildSampleQuote()));
+        when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
+        when(logoResource.exists()).thenReturn(false);
+
+        byte[] result = pdfService.generateQuotePdf(1L);
+
+        assertThat(result).isNotNull().isNotEmpty();
+        verify(quoteRepository, never()).findByIdAndActiveTrueAndCreatedById(any(), any());
+    }
+
+    @Test
+    void generateQuotePdf_worksWithoutLogo() throws IOException {
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(buildSampleQuote()));
         when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
         when(logoResource.exists()).thenReturn(true);
         when(logoResource.getContentAsByteArray()).thenThrow(new IOException("logo unavailable"));
@@ -79,7 +110,7 @@ class PdfServiceImplTest {
     void generateQuotePdf_worksWithEmptyItemsList() {
         Quote quote = buildSampleQuote();
         quote.getItems().clear();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
         when(logoResource.exists()).thenReturn(false);
 
@@ -92,7 +123,7 @@ class PdfServiceImplTest {
     void generateQuotePdf_skipsInactiveItems() {
         Quote quote = buildSampleQuote();
         quote.getItems().get(0).setActive(false);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
         when(logoResource.exists()).thenReturn(false);
 
