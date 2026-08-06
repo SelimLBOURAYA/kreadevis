@@ -6,11 +6,15 @@ import com.slim.kreadevis_backend.dto.quote.SendQuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.SendQuoteResponse;
 import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.exception.UnprocessableEntityException;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.EmailService;
 import com.slim.kreadevis_backend.service.PdfService;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,17 +30,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteEmailServiceImplTest {
+
+    private static final Long OWNER_ID = 42L;
 
     @Mock private QuoteRepository quoteRepository;
     @Mock private PdfService pdfService;
     @Mock private EmailService emailService;
     @Mock private SpringTemplateEngine templateEngine;
+    @Mock private SecurityUtils securityUtils;
+
+    @BeforeEach
+    void setUp() {
+        User currentUser = new User();
+        currentUser.setId(OWNER_ID);
+        lenient().when(securityUtils.isAdmin()).thenReturn(false);
+        lenient().when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+    }
 
     @AfterEach
     void clearContext() {
@@ -48,7 +61,7 @@ class QuoteEmailServiceImplTest {
                 enabled,
                 new EmailProperties.Mailjet("https://api.mailjet.com/v3.1/send", "k", "s"),
                 new EmailProperties.Sender("noreply@test.local", "Kreadevis"));
-        return new QuoteEmailServiceImpl(quoteRepository, pdfService, emailService, props, templateEngine);
+        return new QuoteEmailServiceImpl(quoteRepository, pdfService, emailService, props, templateEngine, securityUtils);
     }
 
     private Quote quoteWithClientEmail(String email) {
@@ -65,7 +78,7 @@ class QuoteEmailServiceImplTest {
     void sendQuoteToClient_shouldSendPdfAndPersistTrace() {
         authenticate("merchant");
         Quote quote = quoteWithClientEmail("client@example.com");
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(pdfService.generateQuotePdf(1L)).thenReturn(new byte[]{1, 2, 3});
         when(templateEngine.process(eq("email/quote"), any())).thenReturn("<html>body</html>");
 
@@ -89,7 +102,7 @@ class QuoteEmailServiceImplTest {
     void sendQuoteToClient_shouldUseRecipientOverride() {
         authenticate("merchant");
         Quote quote = quoteWithClientEmail("client@example.com");
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(pdfService.generateQuotePdf(1L)).thenReturn(new byte[]{1});
         when(templateEngine.process(eq("email/quote"), any())).thenReturn("<html></html>");
 
@@ -111,10 +124,32 @@ class QuoteEmailServiceImplTest {
     @Test
     void sendQuoteToClient_shouldThrow422_whenNoRecipient() {
         Quote quote = quoteWithClientEmail(null);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> service(true).sendQuoteToClient(1L, new SendQuoteRequest(null, null)))
                 .isInstanceOf(UnprocessableEntityException.class);
         verify(emailService, never()).send(any());
+    }
+
+    @Test
+    void sendQuoteToClient_shouldThrow404_whenQuoteOwnedByAnotherUser() {
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service(true).sendQuoteToClient(1L, null))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(emailService, never()).send(any());
+    }
+
+    @Test
+    void sendQuoteToClient_shouldBypassOwnership_whenAdmin() {
+        when(securityUtils.isAdmin()).thenReturn(true);
+        Quote quote = quoteWithClientEmail("client@example.com");
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(pdfService.generateQuotePdf(1L)).thenReturn(new byte[]{1});
+        when(templateEngine.process(eq("email/quote"), any())).thenReturn("<html></html>");
+
+        service(true).sendQuoteToClient(1L, null);
+
+        verify(quoteRepository, never()).findByIdAndActiveTrueAndCreatedById(any(), any());
     }
 }

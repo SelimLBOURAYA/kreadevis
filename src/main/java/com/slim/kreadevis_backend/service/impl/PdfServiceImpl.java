@@ -10,6 +10,7 @@ import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.entity.QuoteItem;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.PdfService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -36,12 +37,16 @@ public class PdfServiceImpl implements PdfService {
     private final QuoteRepository quoteRepository;
     private final AppProperties appProperties;
     private final ResourceLoader resourceLoader;
+    private final SecurityUtils securityUtils;
 
     @Override
     @Transactional(readOnly = true)
     public byte[] generateQuotePdf(Long quoteId) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.isAdmin()
+                ? quoteRepository.findByIdAndActiveTrue(quoteId)
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
+                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
         return buildPdf(quote);
     }
 

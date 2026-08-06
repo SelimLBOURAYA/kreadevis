@@ -99,6 +99,17 @@ class QuoteItemServiceImplTest {
                 .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }
 
+    @Test
+    void addItem_shouldThrow404_whenProductOwnedByAnotherUser() {
+        Quote quote = quoteWithStatus(QuoteStatus.DRAFT);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(5L, OWNER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.addItem(1L, new QuoteItemRequest(5L, 1L)))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class)
+                .hasMessageContaining("Product not found");
+    }
+
     // --- snapshot VAT + recompute totals ---
 
     @Test
@@ -110,7 +121,7 @@ class QuoteItemServiceImplTest {
                 .vatRate(new BigDecimal("20"))
                 .build();
         when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
-        when(productRepository.findByIdAndActiveTrue(5L)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(5L, OWNER_ID)).thenReturn(Optional.of(product));
         when(quoteItemRepository.save(any(QuoteItem.class))).thenAnswer(inv -> inv.getArgument(0));
         when(quoteMapper.toItemResponse(any(QuoteItem.class)))
                 .thenReturn(new QuoteItemResponse(null, null, 2L, new BigDecimal("100.00"),
@@ -173,7 +184,7 @@ class QuoteItemServiceImplTest {
                 .vatRate(new BigDecimal("20"))
                 .build();
         when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
-        when(productRepository.findByIdAndActiveTrue(6L)).thenReturn(Optional.of(newProduct));
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(6L, OWNER_ID)).thenReturn(Optional.of(newProduct));
         when(quoteItemRepository.save(any(QuoteItem.class))).thenAnswer(inv -> inv.getArgument(0));
         when(quoteMapper.toItemResponse(any(QuoteItem.class)))
                 .thenReturn(new QuoteItemResponse(null, null, 1L, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));

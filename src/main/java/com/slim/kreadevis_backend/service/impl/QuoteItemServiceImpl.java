@@ -36,8 +36,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     @Transactional
     public QuoteItemResponse addItem(Long quoteId, QuoteItemRequest request) {
         Quote quote = loadModifiableQuote(quoteId);
-        Product product = productRepository.findByIdAndActiveTrue(request.productId())
-                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
+        Product product = getOwnedProduct(request.productId());
 
         QuoteItem item = QuoteItem.builder()
                 .quote(quote)
@@ -65,8 +64,7 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         if (!item.getQuote().getId().equals(quoteId)) {
             throw new EntityNotFoundException("QuoteItem " + itemId + " does not belong to quote " + quoteId);
         }
-        Product product = productRepository.findByIdAndActiveTrue(request.productId())
-                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + request.productId()));
+        Product product = getOwnedProduct(request.productId());
 
         item.setProduct(product);
         item.setQuantity(request.quantity());
@@ -110,4 +108,13 @@ public class QuoteItemServiceImpl implements QuoteItemService {
         return quote;
     }
 
+    /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else can only use their own products. */
+    private Product getOwnedProduct(Long productId) {
+        if (securityUtils.isAdmin()) {
+            return productRepository.findByIdAndActiveTrue(productId)
+                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
+        }
+        return productRepository.findByIdAndActiveTrueAndCreatedById(productId, securityUtils.getCurrentUser().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
+    }
 }
