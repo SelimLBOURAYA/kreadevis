@@ -42,7 +42,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 12b | feat/lot-12b-front-unblock     | ✅ terminé  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ✅ terminé  | API                |
 | 14  | feat/lot-14-api-hygiene        | ✅ terminé  | qualité / API      |
-| 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
+| 15  | feat/lot-15-rbac-ownership     | ✅ terminé  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
 | 17  | feat/lot-17-dockerization      | ⬜ à faire  | infra              |
 | 18  | feat/lot-18-client-embedded-address | ⬜ optionnel | API           |
@@ -823,13 +823,21 @@ Standardiser le contrat HTTP, exposer une spec consommable par le front Angular,
 
 ---
 
-## LOT 15 — RBAC & Ownership ⬜
+## LOT 15 — RBAC & Ownership ✅
 
 **Branche :** `feat/lot-15-rbac-ownership`
-**Commits cibles :**
+**Commits :**
 - `feat(15): add createdBy ownership to client and product`
 - `feat(15): scope service queries to current user`
 - `feat(15): protect admin endpoints with @PreAuthorize`
+- `fix(15): scope pdf, email and quote-item product lookups to owner`
+
+**Fait (2026-08-06)** — voir `docs/audits/lot-15.md` (0 Critical, 0 Warning, 3 Info).
+Extension au-delà du périmètre initial : le PDF de devis, l'envoi email et le
+produit référencé dans une ligne de devis étaient encore lisibles/modifiables
+via un id deviné même après les 3 premiers commits — fermé dans le 4e commit
+(cohérent avec l'objectif « ne voit et ne modifie que ses propres ressources »,
+détaillé dans le rapport d'audit).
 
 ### Objectif
 À partir de ce lot, un utilisateur connecté ne voit et ne modifie **que ses propres ressources**. Les opérations transversales (gestion des utilisateurs notamment) sont restreintes à `ROLE_ADMIN`.
