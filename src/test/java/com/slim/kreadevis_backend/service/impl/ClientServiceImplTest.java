@@ -4,10 +4,13 @@ import com.slim.kreadevis_backend.dto.client.ClientRequest;
 import com.slim.kreadevis_backend.dto.client.ClientResponse;
 import com.slim.kreadevis_backend.entity.Address;
 import com.slim.kreadevis_backend.entity.Client;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.ClientMapper;
 import com.slim.kreadevis_backend.repository.AddressRepository;
 import com.slim.kreadevis_backend.repository.ClientRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,16 +34,28 @@ class ClientServiceImplTest {
     @Mock private ClientRepository clientRepository;
     @Mock private AddressRepository addressRepository;
     @Mock private ClientMapper clientMapper;
+    @Mock private SecurityUtils securityUtils;
     @InjectMocks private ClientServiceImpl clientService;
 
     private static final Long ADDRESS_ID = 10L;
+    private static final Long OWNER_ID = 42L;
+
+    private User currentUser;
+
+    @BeforeEach
+    void setUp() {
+        currentUser = new User();
+        currentUser.setId(OWNER_ID);
+    }
 
     @Test
-    void findAll_shouldReturnMappedPage() {
+    void findAll_shouldReturnMappedPage_scopedToOwner_whenNotAdmin() {
         Client client = new Client();
         ClientResponse response = dummyResponse();
         Pageable pageable = PageRequest.of(0, 20);
-        when(clientRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(client)));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.searchByOwner(null, OWNER_ID, pageable)).thenReturn(new PageImpl<>(List.of(client)));
         when(clientMapper.toResponse(client)).thenReturn(response);
 
         Page<ClientResponse> result = clientService.findAll(null, pageable);
@@ -49,10 +64,27 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void findById_shouldReturnResponse_whenFound() {
+    void findAll_shouldReturnAllClients_whenAdmin() {
         Client client = new Client();
         ClientResponse response = dummyResponse();
-        when(clientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(client));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(clientRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(client)));
+        when(clientMapper.toResponse(client)).thenReturn(response);
+
+        Page<ClientResponse> result = clientService.findAll(null, pageable);
+
+        assertThat(result.getContent()).hasSize(1).contains(response);
+        verify(clientRepository, never()).searchByOwner(any(), any(), any());
+    }
+
+    @Test
+    void findById_shouldReturnResponse_whenOwnedByCurrentUser() {
+        Client client = new Client();
+        ClientResponse response = dummyResponse();
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(client));
         when(clientMapper.toResponse(client)).thenReturn(response);
 
         ClientResponse result = clientService.findById(1L);
@@ -61,21 +93,38 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void findById_shouldThrow_whenNotFound() {
-        when(clientRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+    void findById_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> clientService.findById(99L))
+        assertThatThrownBy(() -> clientService.findById(1L))
                 .isInstanceOf(EntityNotFoundException.class)
-                .hasMessage("Client not found: 99");
+                .hasMessage("Client not found: 1");
     }
 
     @Test
-    void create_shouldSaveAndReturnResponse() {
+    void findById_shouldBypassOwnership_whenAdmin() {
+        Client client = new Client();
+        ClientResponse response = dummyResponse();
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(clientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(client));
+        when(clientMapper.toResponse(client)).thenReturn(response);
+
+        ClientResponse result = clientService.findById(1L);
+
+        assertThat(result).isEqualTo(response);
+        verify(clientRepository, never()).findByIdAndActiveTrueAndCreatedById(any(), any());
+    }
+
+    @Test
+    void create_shouldSaveWithCurrentUserAsCreatedBy() {
         ClientRequest request = requestWithAddress();
         Address address = new Address();
         Client client = new Client();
         Client saved = new Client();
         ClientResponse response = dummyResponse();
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
         when(addressRepository.findByIdAndActiveTrue(ADDRESS_ID)).thenReturn(Optional.of(address));
         when(clientMapper.toEntity(request)).thenReturn(client);
         when(clientRepository.save(client)).thenReturn(saved);
@@ -84,6 +133,7 @@ class ClientServiceImplTest {
         ClientResponse result = clientService.create(request);
 
         assertThat(result).isEqualTo(response);
+        assertThat(client.getCreatedBy()).isEqualTo(currentUser);
         verify(clientRepository).save(client);
     }
 
@@ -98,12 +148,14 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void update_shouldApplyAndSave_whenFound() {
+    void update_shouldApplyAndSave_whenOwnedByCurrentUser() {
         ClientRequest request = requestWithAddress();
         Address address = new Address();
         Client client = new Client();
         ClientResponse response = dummyResponse();
-        when(clientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(client));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(client));
         when(addressRepository.findByIdAndActiveTrue(ADDRESS_ID)).thenReturn(Optional.of(address));
         when(clientRepository.save(client)).thenReturn(client);
         when(clientMapper.toResponse(client)).thenReturn(response);
@@ -116,8 +168,10 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void update_shouldThrow_whenClientNotFound() {
-        when(clientRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+    void update_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clientService.update(99L, requestWithAddress()))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -126,7 +180,9 @@ class ClientServiceImplTest {
     @Test
     void update_shouldThrow_whenAddressNotFound() {
         Client client = new Client();
-        when(clientRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(client));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(client));
         when(addressRepository.findByIdAndActiveTrue(ADDRESS_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clientService.update(1L, requestWithAddress()))
@@ -134,10 +190,12 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void delete_shouldDeactivateAndSave_whenFound() {
+    void delete_shouldDeactivateAndSave_whenOwnedByCurrentUser() {
         Client client = new Client();
         client.setActive(true);
-        when(clientRepository.findById(1L)).thenReturn(Optional.of(client));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(client));
 
         clientService.delete(1L);
 
@@ -146,8 +204,10 @@ class ClientServiceImplTest {
     }
 
     @Test
-    void delete_shouldThrow_whenNotFound() {
-        when(clientRepository.findById(99L)).thenReturn(Optional.empty());
+    void delete_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clientService.delete(99L))
                 .isInstanceOf(EntityNotFoundException.class);

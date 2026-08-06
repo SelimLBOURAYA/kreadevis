@@ -6,10 +6,13 @@ import com.slim.kreadevis_backend.entity.Product;
 import com.slim.kreadevis_backend.entity.Quote;
 import com.slim.kreadevis_backend.entity.QuoteItem;
 import com.slim.kreadevis_backend.entity.QuoteStatus;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.repository.QuoteItemRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,14 +38,25 @@ class QuoteItemServiceImplTest {
     @Mock private QuoteItemRepository quoteItemRepository;
     @Mock private ProductRepository productRepository;
     @Mock private QuoteMapper quoteMapper;
+    @Mock private SecurityUtils securityUtils;
     @InjectMocks private QuoteItemServiceImpl service;
+
+    private static final Long OWNER_ID = 42L;
+
+    @BeforeEach
+    void setUp() {
+        User currentUser = new User();
+        currentUser.setId(OWNER_ID);
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+    }
 
     // --- status guards ---
 
     @Test
     void addItem_shouldThrow_whenQuoteFinalized() {
         Quote quote = quoteWithStatus(QuoteStatus.FINALIZED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> service.addItem(1L, new QuoteItemRequest(5L, 1L)))
                 .isInstanceOf(IllegalStateException.class)
@@ -52,7 +66,7 @@ class QuoteItemServiceImplTest {
     @Test
     void addItem_shouldThrow_whenQuoteCancelled() {
         Quote quote = quoteWithStatus(QuoteStatus.CANCELLED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> service.addItem(1L, new QuoteItemRequest(5L, 1L)))
                 .isInstanceOf(IllegalStateException.class)
@@ -62,7 +76,7 @@ class QuoteItemServiceImplTest {
     @Test
     void updateItem_shouldThrow_whenQuoteFinalized() {
         Quote quote = quoteWithStatus(QuoteStatus.FINALIZED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> service.updateItem(1L, 10L, new QuoteItemRequest(5L, 1L)))
                 .isInstanceOf(IllegalStateException.class);
@@ -71,10 +85,18 @@ class QuoteItemServiceImplTest {
     @Test
     void deleteItem_shouldThrow_whenQuoteCancelled() {
         Quote quote = quoteWithStatus(QuoteStatus.CANCELLED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> service.deleteItem(1L, 10L))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void addItem_shouldThrow404_whenQuoteOwnedByAnotherUser() {
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.addItem(1L, new QuoteItemRequest(5L, 1L)))
+                .isInstanceOf(jakarta.persistence.EntityNotFoundException.class);
     }
 
     // --- snapshot VAT + recompute totals ---
@@ -87,7 +109,7 @@ class QuoteItemServiceImplTest {
                 .unitPrice(new BigDecimal("100.00"))
                 .vatRate(new BigDecimal("20"))
                 .build();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(productRepository.findByIdAndActiveTrue(5L)).thenReturn(Optional.of(product));
         when(quoteItemRepository.save(any(QuoteItem.class))).thenAnswer(inv -> inv.getArgument(0));
         when(quoteMapper.toItemResponse(any(QuoteItem.class)))
@@ -122,7 +144,7 @@ class QuoteItemServiceImplTest {
                 .build();
         quote.getItems().add(item);
 
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteItemRepository.findById(10L)).thenReturn(Optional.of(item));
 
         service.deleteItem(1L, 10L);
@@ -150,7 +172,7 @@ class QuoteItemServiceImplTest {
                 .unitPrice(new BigDecimal("200.00"))
                 .vatRate(new BigDecimal("20"))
                 .build();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(productRepository.findByIdAndActiveTrue(6L)).thenReturn(Optional.of(newProduct));
         when(quoteItemRepository.save(any(QuoteItem.class))).thenAnswer(inv -> inv.getArgument(0));
         when(quoteMapper.toItemResponse(any(QuoteItem.class)))
@@ -179,7 +201,7 @@ class QuoteItemServiceImplTest {
                 .active(true)
                 .quote(otherQuote)
                 .build();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteItemRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.updateItem(1L, 10L, new QuoteItemRequest(5L, 1L)))
@@ -198,7 +220,7 @@ class QuoteItemServiceImplTest {
                 .active(true)
                 .quote(otherQuote)
                 .build();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteItemRepository.findById(10L)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.deleteItem(1L, 10L))

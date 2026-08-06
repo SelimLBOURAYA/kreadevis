@@ -9,14 +9,12 @@ import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ClientRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
-import com.slim.kreadevis_backend.repository.UserRepository;
-import com.slim.kreadevis_backend.security.UserDetailsImpl;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,43 +30,54 @@ public class QuoteServiceImpl implements QuoteService {
 
     private final QuoteRepository quoteRepository;
     private final ClientRepository clientRepository;
-    private final UserRepository userRepository;
     private final QuoteMapper quoteMapper;
+    private final SecurityUtils securityUtils;
 
     @Override
     @Transactional(readOnly = true)
     public Page<QuoteResponse> findAll(QuoteStatus status, LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        return quoteRepository.findByFilters(status, startDate, endDate, pageable).map(quoteMapper::toResponse);
+        Page<Quote> quotes = securityUtils.isAdmin()
+                ? quoteRepository.findByFilters(status, startDate, endDate, pageable)
+                : quoteRepository.findByFiltersForOwner(securityUtils.getCurrentUser().getId(), status, startDate, endDate, pageable);
+        return quotes.map(quoteMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public QuoteResponse findById(Long id) {
-        return quoteMapper.toResponse(quoteRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id)));
+        return quoteMapper.toResponse(getOwnedQuote(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<QuoteResponse> findByClientId(Long clientId) {
-        return quoteRepository.findByClientIdAndActiveTrue(clientId).stream().map(quoteMapper::toResponse).toList();
+        List<Quote> quotes = securityUtils.isAdmin()
+                ? quoteRepository.findByClientIdAndActiveTrue(clientId)
+                : quoteRepository.findByClientIdAndActiveTrueAndCreatedById(clientId, securityUtils.getCurrentUser().getId());
+        return quotes.stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public QuoteResponse findByReferenceCode(String referenceCode) {
-        return quoteMapper.toResponse(quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
+        var quote = securityUtils.isAdmin()
+                ? quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
+                : quoteRepository.findByReferenceCodeAndActiveTrueAndCreatedById(referenceCode, securityUtils.getCurrentUser().getId());
+        return quoteMapper.toResponse(quote.orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
     }
 
     @Override
     @Transactional
     public QuoteResponse create(QuoteRequest request) {
-        Client client = clientRepository.findByIdAndActiveTrue(request.clientId())
-                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()));
+        User currentUser = securityUtils.getCurrentUser();
+        Client client = securityUtils.isAdmin()
+                ? clientRepository.findByIdAndActiveTrue(request.clientId())
+                        .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()))
+                : clientRepository.findByIdAndActiveTrueAndCreatedById(request.clientId(), currentUser.getId())
+                        .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()));
         Quote quote = Quote.builder()
                 .client(client)
-                .createdBy(getCurrentUser())
+                .createdBy(currentUser)
                 .build();
         return quoteMapper.toResponse(quoteRepository.save(quote));
     }
@@ -76,8 +85,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public QuoteResponse finalize(Long id) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        Quote quote = getOwnedQuote(id);
 
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
             throw new IllegalStateException("Quote already finalized");
@@ -97,8 +105,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public QuoteResponse pending(Long id) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        Quote quote = getOwnedQuote(id);
         if (quote.getStatus() == QuoteStatus.CANCELLED) {
             throw new IllegalStateException("Cannot set a cancelled quote to pending");
         }
@@ -109,8 +116,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public QuoteResponse cancel(Long id) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        Quote quote = getOwnedQuote(id);
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
             throw new IllegalStateException("Cannot cancel a finalized quote");
         }
@@ -121,8 +127,11 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public void delete(Long id) {
-        Quote quote = quoteRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        Quote quote = securityUtils.isAdmin()
+                ? quoteRepository.findById(id)
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id))
+                : quoteRepository.findByIdAndCreatedById(id, securityUtils.getCurrentUser().getId())
+                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
             throw new IllegalStateException("Cannot delete a finalized quote");
         }
@@ -131,18 +140,21 @@ public class QuoteServiceImpl implements QuoteService {
         quoteRepository.save(quote);
     }
 
+    /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else only sees their own quotes. */
+    private Quote getOwnedQuote(Long id) {
+        if (securityUtils.isAdmin()) {
+            return quoteRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        }
+        return quoteRepository.findByIdAndActiveTrueAndCreatedById(id, securityUtils.getCurrentUser().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+    }
+
     private void assignReferenceCode(Quote quote) {
-        User currentUser = getCurrentUser();
+        User currentUser = securityUtils.getCurrentUser();
         LocalDate today = LocalDate.now();
         int nextSequence = quoteRepository.findMaxDailySequenceByUserAndDate(currentUser.getId(), today) + 1;
         quote.setDailySequence(nextSequence);
         quote.setReferenceCode(today.format(DATE_FORMAT) + "-" + currentUser.getId() + "-" + String.format("%03d", nextSequence));
-    }
-
-    private User getCurrentUser() {
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        var userDetails = (UserDetailsImpl) auth.getPrincipal();
-        return userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found in DB"));
     }
 }

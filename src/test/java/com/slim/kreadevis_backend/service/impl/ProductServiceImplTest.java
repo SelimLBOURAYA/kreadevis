@@ -4,10 +4,13 @@ import com.slim.kreadevis_backend.dto.product.ProductRequest;
 import com.slim.kreadevis_backend.dto.product.ProductResponse;
 import com.slim.kreadevis_backend.entity.Product;
 import com.slim.kreadevis_backend.entity.Professional;
+import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.ProductMapper;
 import com.slim.kreadevis_backend.repository.ProfessionalRepository;
 import com.slim.kreadevis_backend.repository.ProductRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,14 +36,27 @@ class ProductServiceImplTest {
     @Mock private ProductRepository productRepository;
     @Mock private ProfessionalRepository professionalRepository;
     @Mock private ProductMapper productMapper;
+    @Mock private SecurityUtils securityUtils;
     @InjectMocks private ProductServiceImpl productService;
 
+    private static final Long OWNER_ID = 42L;
+
+    private User currentUser;
+
+    @BeforeEach
+    void setUp() {
+        currentUser = new User();
+        currentUser.setId(OWNER_ID);
+    }
+
     @Test
-    void findAll_shouldReturnMappedPage() {
+    void findAll_shouldReturnMappedPage_scopedToOwner_whenNotAdmin() {
         Product product = new Product();
         ProductResponse response = dummyResponse();
         Pageable pageable = PageRequest.of(0, 20);
-        when(productRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(product)));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.searchByOwner(null, OWNER_ID, pageable)).thenReturn(new PageImpl<>(List.of(product)));
         when(productMapper.toResponse(product)).thenReturn(response);
 
         Page<ProductResponse> result = productService.findAll(null, pageable);
@@ -49,10 +65,27 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void findById_shouldReturnResponse_whenFound() {
+    void findAll_shouldReturnAllProducts_whenAdmin() {
         Product product = new Product();
         ProductResponse response = dummyResponse();
-        when(productRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(productRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(product)));
+        when(productMapper.toResponse(product)).thenReturn(response);
+
+        Page<ProductResponse> result = productService.findAll(null, pageable);
+
+        assertThat(result.getContent()).hasSize(1).contains(response);
+        verify(productRepository, never()).searchByOwner(any(), any(), any());
+    }
+
+    @Test
+    void findById_shouldReturnResponse_whenOwnedByCurrentUser() {
+        Product product = new Product();
+        ProductResponse response = dummyResponse();
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(product));
         when(productMapper.toResponse(product)).thenReturn(response);
 
         ProductResponse result = productService.findById(1L);
@@ -61,8 +94,10 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void findById_shouldThrow_whenNotFound() {
-        when(productRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+    void findById_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.findById(99L))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -70,10 +105,25 @@ class ProductServiceImplTest {
     }
 
     @Test
+    void findById_shouldBypassOwnership_whenAdmin() {
+        Product product = new Product();
+        ProductResponse response = dummyResponse();
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(productRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
+        when(productMapper.toResponse(product)).thenReturn(response);
+
+        ProductResponse result = productService.findById(1L);
+
+        assertThat(result).isEqualTo(response);
+        verify(productRepository, never()).findByIdAndActiveTrueAndCreatedById(any(), any());
+    }
+
+    @Test
     void create_shouldSaveWithoutSupplier_whenSupplierIdNull() {
         ProductRequest request = requestWithoutSupplier();
         Product entity = new Product();
         ProductResponse response = dummyResponse();
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
         when(productMapper.toEntity(request)).thenReturn(entity);
         when(productRepository.save(entity)).thenReturn(entity);
         when(productMapper.toResponse(entity)).thenReturn(response);
@@ -81,6 +131,7 @@ class ProductServiceImplTest {
         ProductResponse result = productService.create(request);
 
         assertThat(result).isEqualTo(response);
+        assertThat(entity.getCreatedBy()).isEqualTo(currentUser);
         verifyNoInteractions(professionalRepository);
     }
 
@@ -90,6 +141,7 @@ class ProductServiceImplTest {
         Product entity = new Product();
         Professional supplier = new Professional();
         ProductResponse response = dummyResponse();
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
         when(productMapper.toEntity(request)).thenReturn(entity);
         when(professionalRepository.findByIdAndActiveTrue(5L)).thenReturn(Optional.of(supplier));
         when(productRepository.save(entity)).thenReturn(entity);
@@ -113,11 +165,13 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void update_shouldApplyAndSave_whenFound() {
+    void update_shouldApplyAndSave_whenOwnedByCurrentUser() {
         ProductRequest request = requestWithoutSupplier();
         Product product = new Product();
         ProductResponse response = dummyResponse();
-        when(productRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(product));
         when(productRepository.save(product)).thenReturn(product);
         when(productMapper.toResponse(product)).thenReturn(response);
 
@@ -133,7 +187,9 @@ class ProductServiceImplTest {
         Product product = new Product();
         Professional supplier = new Professional();
         ProductResponse response = dummyResponse();
-        when(productRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(product));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(product));
         when(professionalRepository.findByIdAndActiveTrue(5L)).thenReturn(Optional.of(supplier));
         when(productRepository.save(product)).thenReturn(product);
         when(productMapper.toResponse(product)).thenReturn(response);
@@ -145,18 +201,22 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void update_shouldThrow_whenNotFound() {
-        when(productRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+    void update_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.update(99L, requestWithoutSupplier()))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test
-    void delete_shouldDeactivateAndSave_whenFound() {
+    void delete_shouldDeactivateAndSave_whenOwnedByCurrentUser() {
         Product product = new Product();
         product.setActive(true);
-        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(product));
 
         productService.delete(1L);
 
@@ -165,8 +225,10 @@ class ProductServiceImplTest {
     }
 
     @Test
-    void delete_shouldThrow_whenNotFound() {
-        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+    void delete_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(productRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> productService.delete(99L))
                 .isInstanceOf(EntityNotFoundException.class);

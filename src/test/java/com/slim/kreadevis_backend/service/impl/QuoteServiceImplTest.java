@@ -10,23 +10,18 @@ import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ClientRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
-import com.slim.kreadevis_backend.repository.UserRepository;
-import com.slim.kreadevis_backend.security.UserDetailsImpl;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,20 +39,34 @@ class QuoteServiceImplTest {
 
     @Mock private QuoteRepository quoteRepository;
     @Mock private ClientRepository clientRepository;
-    @Mock private UserRepository userRepository;
     @Mock private QuoteMapper quoteMapper;
+    @Mock private SecurityUtils securityUtils;
     @InjectMocks private QuoteServiceImpl quoteService;
+
+    private static final Long OWNER_ID = 42L;
+
+    private User currentUser;
+
+    @BeforeEach
+    void setUp() {
+        currentUser = new User();
+        currentUser.setId(OWNER_ID);
+        currentUser.setLogin("testuser");
+    }
 
     // --- findAll ---
 
     @Test
-    void findAll_shouldReturnMappedPage() {
+    void findAll_shouldReturnMappedPage_scopedToOwner_whenNotAdmin() {
         LocalDate start = LocalDate.of(2026, 1, 1);
         LocalDate end = LocalDate.of(2026, 12, 31);
         Quote quote = new Quote();
         QuoteResponse response = dummyResponse();
         Pageable pageable = PageRequest.of(0, 20);
-        when(quoteRepository.findByFilters(QuoteStatus.DRAFT, start, end, pageable)).thenReturn(new PageImpl<>(List.of(quote)));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByFiltersForOwner(OWNER_ID, QuoteStatus.DRAFT, start, end, pageable))
+                .thenReturn(new PageImpl<>(List.of(quote)));
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
         Page<QuoteResponse> result = quoteService.findAll(QuoteStatus.DRAFT, start, end, pageable);
@@ -65,13 +74,30 @@ class QuoteServiceImplTest {
         assertThat(result.getContent()).hasSize(1).contains(response);
     }
 
+    @Test
+    void findAll_shouldReturnAllQuotes_whenAdmin() {
+        Quote quote = new Quote();
+        QuoteResponse response = dummyResponse();
+        Pageable pageable = PageRequest.of(0, 20);
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(quoteRepository.findByFilters(null, null, null, pageable)).thenReturn(new PageImpl<>(List.of(quote)));
+        when(quoteMapper.toResponse(quote)).thenReturn(response);
+
+        Page<QuoteResponse> result = quoteService.findAll(null, null, null, pageable);
+
+        assertThat(result.getContent()).hasSize(1).contains(response);
+        verify(quoteRepository, never()).findByFiltersForOwner(any(), any(), any(), any(), any());
+    }
+
     // --- findById ---
 
     @Test
-    void findById_shouldReturnResponse_whenFound() {
+    void findById_shouldReturnResponse_whenOwnedByCurrentUser() {
         Quote quote = new Quote();
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
         QuoteResponse result = quoteService.findById(1L);
@@ -80,21 +106,39 @@ class QuoteServiceImplTest {
     }
 
     @Test
-    void findById_shouldThrow_whenNotFound() {
-        when(quoteRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+    void findById_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> quoteService.findById(99L))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessage("Quote not found: 99");
     }
 
+    @Test
+    void findById_shouldBypassOwnership_whenAdmin() {
+        Quote quote = new Quote();
+        QuoteResponse response = dummyResponse();
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(quoteMapper.toResponse(quote)).thenReturn(response);
+
+        QuoteResponse result = quoteService.findById(1L);
+
+        assertThat(result).isEqualTo(response);
+        verify(quoteRepository, never()).findByIdAndActiveTrueAndCreatedById(any(), any());
+    }
+
     // --- findByClientId ---
 
     @Test
-    void findByClientId_shouldReturnMappedList() {
+    void findByClientId_shouldReturnMappedList_scopedToOwner() {
         Quote quote = new Quote();
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByClientIdAndActiveTrue(10L)).thenReturn(List.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByClientIdAndActiveTrueAndCreatedById(10L, OWNER_ID)).thenReturn(List.of(quote));
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
         List<QuoteResponse> result = quoteService.findByClientId(10L);
@@ -105,10 +149,12 @@ class QuoteServiceImplTest {
     // --- findByReferenceCode ---
 
     @Test
-    void findByReferenceCode_shouldReturnResponse_whenFound() {
+    void findByReferenceCode_shouldReturnResponse_whenOwnedByCurrentUser() {
         Quote quote = new Quote();
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByReferenceCodeAndActiveTrue("REF-001")).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByReferenceCodeAndActiveTrueAndCreatedById("REF-001", OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
         QuoteResponse result = quoteService.findByReferenceCode("REF-001");
@@ -117,8 +163,10 @@ class QuoteServiceImplTest {
     }
 
     @Test
-    void findByReferenceCode_shouldThrow_whenNotFound() {
-        when(quoteRepository.findByReferenceCodeAndActiveTrue("NOPE")).thenReturn(Optional.empty());
+    void findByReferenceCode_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByReferenceCodeAndActiveTrueAndCreatedById("NOPE", OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> quoteService.findByReferenceCode("NOPE"))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -127,14 +175,14 @@ class QuoteServiceImplTest {
     // --- create ---
 
     @Test
-    void create_shouldSaveQuoteWithClientAndCreator() throws Exception {
-        try (var mocks = setupSecurityContext()) {
-
+    void create_shouldSaveQuoteWithClientAndCreator() {
         QuoteRequest request = new QuoteRequest(10L);
         Client client = new Client();
         Quote savedQuote = new Quote();
         QuoteResponse response = dummyResponse();
-        when(clientRepository.findByIdAndActiveTrue(10L)).thenReturn(Optional.of(client));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(10L, OWNER_ID)).thenReturn(Optional.of(client));
         when(quoteRepository.save(any(Quote.class))).thenReturn(savedQuote);
         when(quoteMapper.toResponse(savedQuote)).thenReturn(response);
 
@@ -142,13 +190,14 @@ class QuoteServiceImplTest {
 
         assertThat(result).isEqualTo(response);
         verify(quoteRepository).save(any(Quote.class));
-        }
     }
 
     @Test
-    void create_shouldThrow_whenClientNotFound() {
+    void create_shouldThrow404_whenClientOwnedByAnotherUser() {
         QuoteRequest request = new QuoteRequest(99L);
-        when(clientRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(clientRepository.findByIdAndActiveTrueAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> quoteService.create(request))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -158,15 +207,15 @@ class QuoteServiceImplTest {
     // --- finalize ---
 
     @Test
-    void finalize_shouldSetSequenceAndReference_whenDraft() throws Exception {
-        try (var mocks = setupSecurityContext()) {
-
+    void finalize_shouldSetSequenceAndReference_whenDraft() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.DRAFT);
         quote.setItems(new ArrayList<>());
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
-        when(quoteRepository.findMaxDailySequenceByUserAndDate(42L, LocalDate.now())).thenReturn(0);
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findMaxDailySequenceByUserAndDate(OWNER_ID, LocalDate.now())).thenReturn(0);
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
@@ -175,32 +224,28 @@ class QuoteServiceImplTest {
         assertThat(result).isEqualTo(response);
         assertThat(quote.getStatus()).isEqualTo(QuoteStatus.FINALIZED);
         assertThat(quote.getReferenceCode()).isNotNull().contains("-42-");
-        }
     }
 
     @Test
-    void finalize_shouldRealignDateToToday_evenIfQuoteWasCreatedEarlier() throws Exception {
-        try (var mocks = setupSecurityContext()) {
-
+    void finalize_shouldRealignDateToToday_evenIfQuoteWasCreatedEarlier() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.DRAFT);
         quote.setDate(LocalDate.of(2020, 1, 1));
         quote.setItems(new ArrayList<>());
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
-        when(quoteRepository.findMaxDailySequenceByUserAndDate(42L, LocalDate.now())).thenReturn(0);
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findMaxDailySequenceByUserAndDate(OWNER_ID, LocalDate.now())).thenReturn(0);
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toResponse(quote)).thenReturn(dummyResponse());
 
         quoteService.finalize(1L);
 
         assertThat(quote.getDate()).isEqualTo(LocalDate.now());
-        }
     }
 
     @Test
-    void finalize_shouldRecomputeTotalsWithVat() throws Exception {
-        try (var mocks = setupSecurityContext()) {
-
+    void finalize_shouldRecomputeTotalsWithVat() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.DRAFT);
         QuoteItem item = QuoteItem.builder()
@@ -210,8 +255,10 @@ class QuoteServiceImplTest {
                 .totalPrice(new BigDecimal("100.00"))
                 .build();
         quote.setItems(new ArrayList<>(List.of(item)));
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
-        when(quoteRepository.findMaxDailySequenceByUserAndDate(42L, LocalDate.now())).thenReturn(0);
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
+        when(quoteRepository.findMaxDailySequenceByUserAndDate(OWNER_ID, LocalDate.now())).thenReturn(0);
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toResponse(quote)).thenReturn(dummyResponse());
 
@@ -220,14 +267,15 @@ class QuoteServiceImplTest {
         assertThat(quote.getTotalPriceHt()).isEqualByComparingTo("100.00");
         assertThat(quote.getTotalVat()).isEqualByComparingTo("20.00");
         assertThat(quote.getTotalPriceTtc()).isEqualByComparingTo("120.00");
-        }
     }
 
     @Test
     void finalize_shouldThrow_whenAlreadyFinalized() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.FINALIZED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> quoteService.finalize(1L))
                 .isInstanceOf(IllegalStateException.class)
@@ -238,11 +286,23 @@ class QuoteServiceImplTest {
     void finalize_shouldThrow_whenCancelled() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.CANCELLED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> quoteService.finalize(1L))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Cannot finalize a cancelled quote");
+    }
+
+    @Test
+    void finalize_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> quoteService.finalize(1L))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     // --- pending ---
@@ -252,7 +312,9 @@ class QuoteServiceImplTest {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.DRAFT);
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
@@ -266,7 +328,9 @@ class QuoteServiceImplTest {
     void pending_shouldThrow_whenCancelled() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.CANCELLED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> quoteService.pending(1L))
                 .isInstanceOf(IllegalStateException.class)
@@ -280,7 +344,9 @@ class QuoteServiceImplTest {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.PENDING);
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
         when(quoteRepository.save(quote)).thenReturn(quote);
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
@@ -294,7 +360,9 @@ class QuoteServiceImplTest {
     void cancel_shouldThrow_whenFinalized() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.FINALIZED);
-        when(quoteRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndActiveTrueAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> quoteService.cancel(1L))
                 .isInstanceOf(IllegalStateException.class)
@@ -304,13 +372,15 @@ class QuoteServiceImplTest {
     // --- delete ---
 
     @Test
-    void delete_shouldDeactivateQuoteAndItems_whenFound() {
+    void delete_shouldDeactivateQuoteAndItems_whenOwnedByCurrentUser() {
         Quote quote = new Quote();
         quote.setActive(true);
         QuoteItem item = new QuoteItem();
         item.setActive(true);
         quote.setItems(new ArrayList<>(List.of(item)));
-        when(quoteRepository.findById(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         quoteService.delete(1L);
 
@@ -323,7 +393,9 @@ class QuoteServiceImplTest {
     void delete_shouldThrow_whenFinalized() {
         Quote quote = new Quote();
         quote.setStatus(QuoteStatus.FINALIZED);
-        when(quoteRepository.findById(1L)).thenReturn(Optional.of(quote));
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndCreatedById(1L, OWNER_ID)).thenReturn(Optional.of(quote));
 
         assertThatThrownBy(() -> quoteService.delete(1L))
                 .isInstanceOf(IllegalStateException.class)
@@ -331,37 +403,27 @@ class QuoteServiceImplTest {
     }
 
     @Test
-    void delete_shouldThrow_whenNotFound() {
-        when(quoteRepository.findById(99L)).thenReturn(Optional.empty());
+    void delete_shouldThrow404_whenOwnedByAnotherUser() {
+        when(securityUtils.isAdmin()).thenReturn(false);
+        when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        when(quoteRepository.findByIdAndCreatedById(99L, OWNER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> quoteService.delete(99L))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
-    // --- helpers ---
+    @Test
+    void delete_shouldBypassOwnership_whenAdmin() {
+        Quote quote = new Quote();
+        quote.setActive(true);
+        quote.setItems(new ArrayList<>());
+        when(securityUtils.isAdmin()).thenReturn(true);
+        when(quoteRepository.findById(1L)).thenReturn(Optional.of(quote));
 
-    /**
-     * Sets up the SecurityContextHolder static mock, authentication, and user repository
-     * for tests that call getCurrentUser() (create, finalize).
-     * Caller must call .close() on the returned AutoCloseable after the test.
-     */
-    private AutoCloseable setupSecurityContext() {
-        var securityHolderMock = mockStatic(SecurityContextHolder.class);
-        var securityContext = mock(SecurityContext.class);
-        var authentication = mock(Authentication.class);
-        var userDetails = mock(UserDetailsImpl.class);
+        quoteService.delete(1L);
 
-        securityHolderMock.when(SecurityContextHolder::getContext).thenReturn(securityContext);
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(userDetails);
-        when(userDetails.getId()).thenReturn(42L);
-
-        User currentUser = new User();
-        currentUser.setId(42L);
-        currentUser.setLogin("testuser");
-        when(userRepository.findById(42L)).thenReturn(Optional.of(currentUser));
-
-        return securityHolderMock;
+        assertThat(quote.isActive()).isFalse();
+        verify(quoteRepository, never()).findByIdAndCreatedById(any(), any());
     }
 
     private QuoteResponse dummyResponse() {

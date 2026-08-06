@@ -16,7 +16,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             + "OR LOWER(p.referenceCode) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Product> search(@Param("search") String search, Pageable pageable);
 
+    @Query("SELECT p FROM Product p WHERE p.active = true AND p.createdBy.id = :ownerId "
+            + "AND (:search IS NULL OR LOWER(p.label) LIKE LOWER(CONCAT('%', :search, '%')) "
+            + "OR LOWER(p.referenceCode) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Product> searchByOwner(@Param("search") String search, @Param("ownerId") Long ownerId, Pageable pageable);
+
     Optional<Product> findByIdAndActiveTrue(Long id);
+
+    Optional<Product> findByIdAndActiveTrueAndCreatedById(Long id, Long ownerId);
 
     Optional<Product> findByReferenceCodeAndActiveTrue(String referenceCode);
 }

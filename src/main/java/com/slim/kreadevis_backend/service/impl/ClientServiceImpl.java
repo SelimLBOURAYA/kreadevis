@@ -7,6 +7,7 @@ import com.slim.kreadevis_backend.entity.Client;
 import com.slim.kreadevis_backend.mapper.ClientMapper;
 import com.slim.kreadevis_backend.repository.AddressRepository;
 import com.slim.kreadevis_backend.repository.ClientRepository;
+import com.slim.kreadevis_backend.security.SecurityUtils;
 import com.slim.kreadevis_backend.service.ClientService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -21,16 +22,19 @@ public class ClientServiceImpl implements ClientService {
     private final ClientRepository clientRepository;
     private final AddressRepository addressRepository;
     private final ClientMapper clientMapper;
+    private final SecurityUtils securityUtils;
 
     @Override
     public Page<ClientResponse> findAll(String search, Pageable pageable) {
-        return clientRepository.search(search, pageable).map(clientMapper::toResponse);
+        Page<Client> clients = securityUtils.isAdmin()
+                ? clientRepository.search(search, pageable)
+                : clientRepository.searchByOwner(search, securityUtils.getCurrentUser().getId(), pageable);
+        return clients.map(clientMapper::toResponse);
     }
 
     @Override
     public ClientResponse findById(Long id) {
-        return clientMapper.toResponse(clientRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id)));
+        return clientMapper.toResponse(getOwnedClient(id));
     }
 
     @Override
@@ -39,13 +43,13 @@ public class ClientServiceImpl implements ClientService {
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + request.addressId()));
         Client client = clientMapper.toEntity(request);
         client.setAddress(address);
+        client.setCreatedBy(securityUtils.getCurrentUser());
         return clientMapper.toResponse(clientRepository.save(client));
     }
 
     @Override
     public ClientResponse update(Long id, ClientRequest request) {
-        Client client = clientRepository.findByIdAndActiveTrue(id)
-                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
+        Client client = getOwnedClient(id);
         Address address = addressRepository.findByIdAndActiveTrue(request.addressId())
                 .orElseThrow(() -> new EntityNotFoundException("Address not found: " + request.addressId()));
         clientMapper.updateEntity(request, client);
@@ -55,9 +59,18 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public void delete(Long id) {
-        Client client = clientRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
+        Client client = getOwnedClient(id);
         client.setActive(false);
         clientRepository.save(client);
+    }
+
+    /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else only sees their own clients. */
+    private Client getOwnedClient(Long id) {
+        if (securityUtils.isAdmin()) {
+            return clientRepository.findByIdAndActiveTrue(id)
+                    .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
+        }
+        return clientRepository.findByIdAndActiveTrueAndCreatedById(id, securityUtils.getCurrentUser().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
     }
 }
