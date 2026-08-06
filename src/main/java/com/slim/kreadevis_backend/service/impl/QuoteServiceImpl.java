@@ -14,6 +14,8 @@ import com.slim.kreadevis_backend.security.UserDetailsImpl;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,8 +37,8 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate) {
-        return quoteRepository.findByDateRange(startDate, endDate).stream().map(quoteMapper::toResponse).toList();
+    public Page<QuoteResponse> findAll(QuoteStatus status, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        return quoteRepository.findByFilters(status, startDate, endDate, pageable).map(quoteMapper::toResponse);
     }
 
     @Override

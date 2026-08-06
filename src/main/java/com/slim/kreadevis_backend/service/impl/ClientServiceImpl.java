@@ -10,9 +10,9 @@ import com.slim.kreadevis_backend.repository.ClientRepository;
 import com.slim.kreadevis_backend.service.ClientService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,8 +23,8 @@ public class ClientServiceImpl implements ClientService {
     private final ClientMapper clientMapper;
 
     @Override
-    public List<ClientResponse> findAll() {
-        return clientRepository.findAllByActiveTrue().stream().map(clientMapper::toResponse).toList();
+    public Page<ClientResponse> findAll(String search, Pageable pageable) {
+        return clientRepository.search(search, pageable).map(clientMapper::toResponse);
     }
 
     @Override

@@ -7,11 +7,11 @@ import com.slim.kreadevis_backend.service.CsvImportService;
 import com.slim.kreadevis_backend.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
@@ -22,8 +22,8 @@ public class ProductController {
     private final CsvImportService csvImportService;
 
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAll() {
-        return ResponseEntity.ok(productService.findAll());
+    public ResponseEntity<Page<ProductResponse>> getAll(@RequestParam(required = false) String search, Pageable pageable) {
+        return ResponseEntity.ok(productService.findAll(search, pageable));
     }
 
     @GetMapping("/{id}")
