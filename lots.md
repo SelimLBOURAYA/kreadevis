@@ -40,7 +40,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 12  | feat/lot-12-quote-integrity    | ✅ terminé  | métier             |
 | SB41 | chore/spring-boot-4-1         | ✅ terminé  | infra              |
 | 12b | feat/lot-12b-front-unblock     | ✅ terminé  | correctifs / API   |
-| 13  | feat/lot-13-pagination         | ⬜ à faire  | API                |
+| 13  | feat/lot-13-pagination         | ✅ terminé  | API                |
 | 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
@@ -689,10 +689,21 @@ Lever les trois blocages identifiés à l'audit du 10/07/2026 qui empêchent le 
 
 ---
 
-## LOT 13 — Pagination & filtres ⬜
+## LOT 13 — Pagination & filtres ✅
 
 **Branche :** `feat/lot-13-pagination`
 **Commit cible :** `feat(13): paginate collection endpoints, add basic filters`
+
+Réalisé (périmètre restreint à clients/products/quotes, décision utilisateur du 2026-08-06 —
+Address/User/Professional restent en `List<>`, hors scope) :
+- `ClientRepository`/`ProductRepository` : méthode `search(String, Pageable)` par `@Query`
+  (LIKE case-insensitive sur `lastName`/`company` et `label`/`referenceCode`)
+- `QuoteRepository.findByFilters(status, startDate, endDate, Pageable)` remplace `findByDateRange`
+- Services et controllers : `findAll(...)` retourne `Page<...Response>`
+- `GET /api/quotes` accepte désormais `?status=...` en plus des dates
+- `application.yaml` : `spring.data.web.pageable.default-page-size: 20` / `max-page-size: 100`
+- Tests : `ClientControllerTest`, `QuoteControllerTest` étendus, `ProductControllerTest` créé
+  (pagination, filtre `search`/`status`, plafond `size=1000` → 100), `QuoteRepositoryTest` mis à jour
 
 ### Objectif
 Aucune ressource liste actuellement n'est paginée. En prod, le premier `GET /api/clients` ou `/api/products` sur une base réelle renvoie tout. Ce lot impose une pagination par défaut et ajoute les filtres de base demandés par le front.
