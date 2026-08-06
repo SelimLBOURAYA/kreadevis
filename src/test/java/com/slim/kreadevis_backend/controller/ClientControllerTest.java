@@ -124,14 +124,15 @@ class ClientControllerTest {
 
     @Test
     @WithMockUser
-    void create_shouldReturn200_whenRequestValid() throws Exception {
+    void create_shouldReturn201_whenRequestValid() throws Exception {
         ClientRequest request = new ClientRequest(null, "Dupont", null, null, null, null, null, null, 1L);
         when(clientService.create(any())).thenReturn(dummyResponse());
 
         mockMvc.perform(post("/api/clients")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/clients/1"))
                 .andExpect(jsonPath("$.id").value(1));
     }
 

@@ -1,6 +1,8 @@
 package com.slim.kreadevis_backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slim.kreadevis_backend.dto.quote.QuoteItemRequest;
+import com.slim.kreadevis_backend.dto.quote.QuoteItemResponse;
 import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
 import com.slim.kreadevis_backend.entity.QuoteStatus;
@@ -103,14 +105,30 @@ class QuoteControllerTest {
 
     @Test
     @WithMockUser
-    void create_shouldReturn200() throws Exception {
+    void create_shouldReturn201() throws Exception {
         when(quoteService.create(any())).thenReturn(dummyResponse());
 
         mockMvc.perform(post("/api/quotes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new QuoteRequest(10L))))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/quotes/1"))
                 .andExpect(jsonPath("$.status").value("DRAFT"));
+    }
+
+    @Test
+    @WithMockUser
+    void addItem_shouldReturn201() throws Exception {
+        QuoteItemRequest request = new QuoteItemRequest(5L, 2L);
+        QuoteItemResponse itemResponse = new QuoteItemResponse(3L, null, 2L, new BigDecimal("10.00"), BigDecimal.ZERO, new BigDecimal("20.00"));
+        when(quoteItemService.addItem(eq(1L), any())).thenReturn(itemResponse);
+
+        mockMvc.perform(post("/api/quotes/1/items")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/quotes/1/items/3"))
+                .andExpect(jsonPath("$.id").value(3));
     }
 
     @Test

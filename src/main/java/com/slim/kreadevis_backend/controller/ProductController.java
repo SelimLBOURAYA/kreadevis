@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URI;
+
 @RestController
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
@@ -33,7 +35,8 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
-        return ResponseEntity.ok(productService.create(request));
+        ProductResponse response = productService.create(request);
+        return ResponseEntity.created(URI.create("/api/products/" + response.id())).body(response);
     }
 
     @PutMapping("/{id}")

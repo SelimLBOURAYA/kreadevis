@@ -118,14 +118,15 @@ class ProductControllerTest {
 
     @Test
     @WithMockUser
-    void create_shouldReturn200_whenRequestValid() throws Exception {
+    void create_shouldReturn201_whenRequestValid() throws Exception {
         ProductRequest request = new ProductRequest("Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", null);
         when(productService.create(any())).thenReturn(dummyResponse());
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/products/1"))
                 .andExpect(jsonPath("$.id").value(1));
     }
 

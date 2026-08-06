@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -29,7 +30,8 @@ public class AddressController {
 
     @PostMapping
     public ResponseEntity<AddressResponse> create(@Valid @RequestBody AddressRequest request) {
-        return ResponseEntity.ok(addressService.create(request));
+        AddressResponse response = addressService.create(request);
+        return ResponseEntity.created(URI.create("/api/addresses/" + response.id())).body(response);
     }
 
     @PutMapping("/{id}")
