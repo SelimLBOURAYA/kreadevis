@@ -4,10 +4,13 @@ import com.slim.kreadevis_backend.dto.quote.QuoteItemRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteItemResponse;
 import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
+import com.slim.kreadevis_backend.entity.QuoteStatus;
 import com.slim.kreadevis_backend.service.QuoteItemService;
 import com.slim.kreadevis_backend.service.QuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +26,12 @@ public class QuoteController {
     private final QuoteItemService quoteItemService;
 
     @GetMapping("/api/quotes")
-    public ResponseEntity<List<QuoteResponse>> getAll(
+    public ResponseEntity<Page<QuoteResponse>> getAll(
+            @RequestParam(required = false) QuoteStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(quoteService.findAll(startDate, endDate));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Pageable pageable) {
+        return ResponseEntity.ok(quoteService.findAll(status, startDate, endDate, pageable));
     }
 
     @GetMapping("/api/quotes/{id}")

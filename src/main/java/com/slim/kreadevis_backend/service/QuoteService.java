@@ -2,12 +2,15 @@ package com.slim.kreadevis_backend.service;
 
 import com.slim.kreadevis_backend.dto.quote.QuoteRequest;
 import com.slim.kreadevis_backend.dto.quote.QuoteResponse;
+import com.slim.kreadevis_backend.entity.QuoteStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
 
 public interface QuoteService {
-    List<QuoteResponse> findAll(LocalDate startDate, LocalDate endDate);
+    Page<QuoteResponse> findAll(QuoteStatus status, LocalDate startDate, LocalDate endDate, Pageable pageable);
     QuoteResponse findById(Long id);
     List<QuoteResponse> findByClientId(Long clientId);
     QuoteResponse findByReferenceCode(String referenceCode);

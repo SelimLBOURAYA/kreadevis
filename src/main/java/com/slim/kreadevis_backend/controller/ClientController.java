@@ -5,10 +5,10 @@ import com.slim.kreadevis_backend.dto.client.ClientResponse;
 import com.slim.kreadevis_backend.service.ClientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/clients")
@@ -18,8 +18,8 @@ public class ClientController {
     private final ClientService clientService;
 
     @GetMapping
-    public ResponseEntity<List<ClientResponse>> getAll() {
-        return ResponseEntity.ok(clientService.findAll());
+    public ResponseEntity<Page<ClientResponse>> getAll(@RequestParam(required = false) String search, Pageable pageable) {
+        return ResponseEntity.ok(clientService.findAll(search, pageable));
     }
 
     @GetMapping("/{id}")

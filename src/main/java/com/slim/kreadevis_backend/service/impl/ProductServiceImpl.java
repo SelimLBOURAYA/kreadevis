@@ -10,9 +10,9 @@ import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.service.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,8 +23,8 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
 
     @Override
-    public List<ProductResponse> findAll() {
-        return productRepository.findAllByActiveTrue().stream().map(productMapper::toResponse).toList();
+    public Page<ProductResponse> findAll(String search, Pageable pageable) {
+        return productRepository.search(search, pageable).map(productMapper::toResponse);
     }
 
     @Override
