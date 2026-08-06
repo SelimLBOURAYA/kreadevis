@@ -42,24 +42,16 @@ public class PdfServiceImpl implements PdfService {
     public byte[] generateQuotePdf(Long quoteId) {
         Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
-        return buildPdf(quote, "DEVIS");
+        return buildPdf(quote);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public byte[] generateInvoicePdf(Long quoteId) {
-        Quote quote = quoteRepository.findByIdAndActiveTrue(quoteId)
-                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
-        return buildPdf(quote, "FACTURE");
-    }
-
-    private byte[] buildPdf(Quote quote, String documentType) {
+    private byte[] buildPdf(Quote quote) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         Document document = new Document(PageSize.A4, 50, 50, 70, 50);
         try {
             PdfWriter.getInstance(document, out);
             document.open();
-            addHeader(document, documentType);
+            addHeader(document, "DEVIS");
             addQuoteInfo(document, quote);
             addClientInfo(document, quote.getClient());
             addItemsTable(document, quote);

@@ -35,15 +35,6 @@ public class QuoteDocumentController {
                 .body(new ByteArrayResource(pdf));
     }
 
-    @GetMapping("/{id}/invoice/pdf")
-    public ResponseEntity<Resource> getInvoicePdf(@PathVariable Long id) {
-        byte[] pdf = pdfService.generateInvoicePdf(id);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"invoice-" + id + ".pdf\"")
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(new ByteArrayResource(pdf));
-    }
-
     @PostMapping("/{id}/send")
     public ResponseEntity<SendQuoteResponse> sendQuote(@PathVariable Long id,
                                                        @Valid @RequestBody(required = false) SendQuoteRequest request) {
