@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+
 @RestController
 @RequestMapping("/api/clients")
 @RequiredArgsConstructor
@@ -29,7 +31,8 @@ public class ClientController {
 
     @PostMapping
     public ResponseEntity<ClientResponse> create(@Valid @RequestBody ClientRequest request) {
-        return ResponseEntity.ok(clientService.create(request));
+        ClientResponse response = clientService.create(request);
+        return ResponseEntity.created(URI.create("/api/clients/" + response.id())).body(response);
     }
 
     @PutMapping("/{id}")

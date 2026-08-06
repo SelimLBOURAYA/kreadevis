@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -29,7 +30,8 @@ public class ProfessionalController {
 
     @PostMapping
     public ResponseEntity<ProfessionalResponse> create(@Valid @RequestBody ProfessionalRequest request) {
-        return ResponseEntity.ok(professionalService.create(request));
+        ProfessionalResponse response = professionalService.create(request);
+        return ResponseEntity.created(URI.create("/api/professionals/" + response.id())).body(response);
     }
 
     @PutMapping("/{id}")

@@ -15,6 +15,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -51,7 +52,8 @@ public class QuoteController {
 
     @PostMapping("/api/quotes")
     public ResponseEntity<QuoteResponse> create(@Valid @RequestBody QuoteRequest request) {
-        return ResponseEntity.ok(quoteService.create(request));
+        QuoteResponse response = quoteService.create(request);
+        return ResponseEntity.created(URI.create("/api/quotes/" + response.id())).body(response);
     }
 
     @PostMapping("/api/quotes/{id}/finalize")
@@ -77,7 +79,8 @@ public class QuoteController {
 
     @PostMapping("/api/quotes/{id}/items")
     public ResponseEntity<QuoteItemResponse> addItem(@PathVariable Long id, @Valid @RequestBody QuoteItemRequest request) {
-        return ResponseEntity.ok(quoteItemService.addItem(id, request));
+        QuoteItemResponse response = quoteItemService.addItem(id, request);
+        return ResponseEntity.created(URI.create("/api/quotes/" + id + "/items/" + response.id())).body(response);
     }
 
     @PutMapping("/api/quotes/{id}/items/{itemId}")
