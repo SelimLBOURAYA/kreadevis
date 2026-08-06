@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-add-quote-sent-tracking.yaml
   - include:
       file: db/changelog/changes/004-quote-fk-not-null.yaml
+  - include:
+      file: db/changelog/changes/005-client-product-ownership.yaml

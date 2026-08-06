@@ -13,7 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(of = "id")
-@ToString(exclude = {"address", "quotes"})
+@ToString(exclude = {"address", "quotes", "createdBy"})
 public class Client {
 
     @Id
@@ -50,4 +50,8 @@ public class Client {
 
     @OneToMany(mappedBy = "client")
     private Set<Quote> quotes = new HashSet<>();
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
 }

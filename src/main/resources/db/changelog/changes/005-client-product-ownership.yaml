@@ -1,0 +1,57 @@
+databaseChangeLog:
+
+  - changeSet:
+      id: 005-clients-created-by-column
+      author: kreadevis
+      changes:
+        - addColumn:
+            tableName: clients
+            columns:
+              - column:
+                  name: created_by
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_clients_created_by
+                    references: users(id)
+
+  - changeSet:
+      id: 005-products-created-by-column
+      author: kreadevis
+      changes:
+        - addColumn:
+            tableName: products
+            columns:
+              - column:
+                  name: created_by
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_products_created_by
+                    references: users(id)
+
+  - changeSet:
+      id: 005-backfill-created-by
+      author: kreadevis
+      comment: Attribute pre-existing clients/products (if any) to the oldest user so the NOT NULL constraint below can be applied.
+      changes:
+        - sql:
+            sql: >
+              UPDATE clients SET created_by = (SELECT MIN(id) FROM users) WHERE created_by IS NULL;
+              UPDATE products SET created_by = (SELECT MIN(id) FROM users) WHERE created_by IS NULL;
+
+  - changeSet:
+      id: 005-clients-created-by-not-null
+      author: kreadevis
+      changes:
+        - addNotNullConstraint:
+            tableName: clients
+            columnName: created_by
+            columnDataType: BIGINT
+
+  - changeSet:
+      id: 005-products-created-by-not-null
+      author: kreadevis
+      changes:
+        - addNotNullConstraint:
+            tableName: products
+            columnName: created_by
+            columnDataType: BIGINT
