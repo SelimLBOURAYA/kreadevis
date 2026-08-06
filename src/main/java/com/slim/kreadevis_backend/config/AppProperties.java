@@ -7,5 +7,5 @@ public record AppProperties(Company company, DocumentConfig document) {
 
     public record Company(String name, String address, String phone, String email, String siren) {}
 
-    public record DocumentConfig(String logoPath, String outputDir, String factureDir) {}
+    public record DocumentConfig(String logoPath, String outputDir) {}
 }

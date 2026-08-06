@@ -38,7 +38,7 @@ class PdfServiceImplTest {
         AppProperties.Company company = new AppProperties.Company(
                 "Test Company", "1 Rue Test", "01 23 45 67 89", "test@company.fr", "123456789");
         AppProperties.DocumentConfig doc = new AppProperties.DocumentConfig(
-                "classpath:static/logo.png", "/tmp/test", "/tmp/test/factures");
+                "classpath:static/logo.png", "/tmp/test");
         AppProperties props = new AppProperties(company, doc);
         pdfService = new PdfServiceImpl(quoteRepository, props, resourceLoader);
     }
@@ -55,30 +55,10 @@ class PdfServiceImplTest {
     }
 
     @Test
-    void generateInvoicePdf_returnsNonEmptyBytes() {
-        when(quoteRepository.findByIdAndActiveTrue(2L)).thenReturn(Optional.of(buildSampleQuote()));
-        when(resourceLoader.getResource("classpath:static/logo.png")).thenReturn(logoResource);
-        when(logoResource.exists()).thenReturn(false);
-
-        byte[] result = pdfService.generateInvoicePdf(2L);
-
-        assertThat(result).isNotNull().isNotEmpty();
-    }
-
-    @Test
     void generateQuotePdf_throwsWhenQuoteNotFound() {
         when(quoteRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> pdfService.generateQuotePdf(99L))
-                .isInstanceOf(EntityNotFoundException.class)
-                .hasMessageContaining("99");
-    }
-
-    @Test
-    void generateInvoicePdf_throwsWhenQuoteNotFound() {
-        when(quoteRepository.findByIdAndActiveTrue(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> pdfService.generateInvoicePdf(99L))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessageContaining("99");
     }

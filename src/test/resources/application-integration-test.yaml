@@ -29,7 +29,6 @@ app:
   document:
     logo-path: classpath:static/logo.png
     output-dir: /tmp/kreadevis-test/documents
-    facture-dir: /tmp/kreadevis-test/factures
   cors:
     allowed-origins: http://localhost:4200
   email:
