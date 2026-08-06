@@ -1,11 +1,12 @@
 package com.slim.kreadevis_backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.slim.kreadevis_backend.dto.client.ClientRequest;
-import com.slim.kreadevis_backend.dto.client.ClientResponse;
+import com.slim.kreadevis_backend.dto.product.ProductRequest;
+import com.slim.kreadevis_backend.dto.product.ProductResponse;
 import com.slim.kreadevis_backend.security.JwtUtils;
 import com.slim.kreadevis_backend.security.UserDetailsServiceImpl;
-import com.slim.kreadevis_backend.service.ClientService;
+import com.slim.kreadevis_backend.service.CsvImportService;
+import com.slim.kreadevis_backend.service.ProductService;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -38,10 +40,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ClientController.class)
-@Import(ClientControllerTest.TestSecurity.class)
+@WebMvcTest(ProductController.class)
+@Import(ProductControllerTest.TestSecurity.class)
 @ImportAutoConfiguration(ServletWebSecurityAutoConfiguration.class)
-class ClientControllerTest {
+class ProductControllerTest {
 
     @TestConfiguration
     static class TestSecurity {
@@ -62,33 +64,34 @@ class ClientControllerTest {
 
     @Autowired MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    @MockitoBean ClientService clientService;
+    @MockitoBean ProductService productService;
+    @MockitoBean CsvImportService csvImportService;
     @MockitoBean JwtUtils jwtUtils;
     @MockitoBean UserDetailsServiceImpl userDetailsService;
 
     @Test
     void getAll_shouldReturn401_whenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/api/clients"))
+        mockMvc.perform(get("/api/products"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser
     void getAll_shouldReturn200WithPage_whenAuthenticated() throws Exception {
-        when(clientService.findAll(isNull(), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
+        when(productService.findAll(isNull(), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
 
-        mockMvc.perform(get("/api/clients"))
+        mockMvc.perform(get("/api/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1))
-                .andExpect(jsonPath("$.content[0].lastName").value("Dupont"));
+                .andExpect(jsonPath("$.content[0].label").value("Widget"));
     }
 
     @Test
     @WithMockUser
     void getAll_shouldRespectPageSize() throws Exception {
-        when(clientService.findAll(isNull(), eq(PageRequest.of(0, 2)))).thenReturn(new PageImpl<>(List.of(dummyResponse())));
+        when(productService.findAll(isNull(), eq(PageRequest.of(0, 2)))).thenReturn(new PageImpl<>(List.of(dummyResponse())));
 
-        mockMvc.perform(get("/api/clients").param("page", "0").param("size", "2"))
+        mockMvc.perform(get("/api/products").param("page", "0").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1));
     }
@@ -96,39 +99,30 @@ class ClientControllerTest {
     @Test
     @WithMockUser
     void getAll_shouldForwardSearchParam() throws Exception {
-        when(clientService.findAll(eq("Dupont"), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
+        when(productService.findAll(eq("Widget"), any())).thenReturn(new PageImpl<>(List.of(dummyResponse())));
 
-        mockMvc.perform(get("/api/clients").param("search", "Dupont"))
+        mockMvc.perform(get("/api/products").param("search", "Widget"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].lastName").value("Dupont"));
-    }
-
-    @Test
-    @WithMockUser
-    void getAll_shouldCapPageSizeAt100() throws Exception {
-        when(clientService.findAll(isNull(), eq(PageRequest.of(0, 100)))).thenReturn(new PageImpl<>(List.of(dummyResponse())));
-
-        mockMvc.perform(get("/api/clients").param("size", "1000"))
-                .andExpect(status().isOk());
+                .andExpect(jsonPath("$.content[0].label").value("Widget"));
     }
 
     @Test
     @WithMockUser
     void getById_shouldReturn404_whenNotFound() throws Exception {
-        when(clientService.findById(99L)).thenThrow(new EntityNotFoundException("Client not found: 99"));
+        when(productService.findById(99L)).thenThrow(new EntityNotFoundException("Product not found: 99"));
 
-        mockMvc.perform(get("/api/clients/99"))
+        mockMvc.perform(get("/api/products/99"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Client not found: 99"));
+                .andExpect(jsonPath("$.message").value("Product not found: 99"));
     }
 
     @Test
     @WithMockUser
     void create_shouldReturn200_whenRequestValid() throws Exception {
-        ClientRequest request = new ClientRequest(null, "Dupont", null, null, null, null, null, null, 1L);
-        when(clientService.create(any())).thenReturn(dummyResponse());
+        ProductRequest request = new ProductRequest("Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", null);
+        when(productService.create(any())).thenReturn(dummyResponse());
 
-        mockMvc.perform(post("/api/clients")
+        mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -137,25 +131,14 @@ class ClientControllerTest {
 
     @Test
     @WithMockUser
-    void create_shouldReturn400_whenLastNameMissing() throws Exception {
-        ClientRequest request = new ClientRequest(null, "", null, null, null, null, null, null, 1L);
-
-        mockMvc.perform(post("/api/clients")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser
     void delete_shouldReturn204() throws Exception {
-        doNothing().when(clientService).delete(1L);
+        doNothing().when(productService).delete(1L);
 
-        mockMvc.perform(delete("/api/clients/1"))
+        mockMvc.perform(delete("/api/products/1"))
                 .andExpect(status().isNoContent());
     }
 
-    private ClientResponse dummyResponse() {
-        return new ClientResponse(1L, null, "Dupont", null, null, null, null);
+    private ProductResponse dummyResponse() {
+        return new ProductResponse(1L, "Widget", "A thing", 100L, new BigDecimal("9.99"), new BigDecimal("0.20"), "WID-001", null);
     }
 }

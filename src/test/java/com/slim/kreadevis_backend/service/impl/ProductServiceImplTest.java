@@ -13,6 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -32,15 +36,16 @@ class ProductServiceImplTest {
     @InjectMocks private ProductServiceImpl productService;
 
     @Test
-    void findAll_shouldReturnMappedList() {
+    void findAll_shouldReturnMappedPage() {
         Product product = new Product();
         ProductResponse response = dummyResponse();
-        when(productRepository.findAllByActiveTrue()).thenReturn(List.of(product));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(productRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(product)));
         when(productMapper.toResponse(product)).thenReturn(response);
 
-        List<ProductResponse> result = productService.findAll();
+        Page<ProductResponse> result = productService.findAll(null, pageable);
 
-        assertThat(result).hasSize(1).contains(response);
+        assertThat(result.getContent()).hasSize(1).contains(response);
     }
 
     @Test

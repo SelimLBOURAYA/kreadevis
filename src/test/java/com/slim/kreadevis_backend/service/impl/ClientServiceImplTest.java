@@ -13,6 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,15 +36,16 @@ class ClientServiceImplTest {
     private static final Long ADDRESS_ID = 10L;
 
     @Test
-    void findAll_shouldReturnMappedList() {
+    void findAll_shouldReturnMappedPage() {
         Client client = new Client();
         ClientResponse response = dummyResponse();
-        when(clientRepository.findAllByActiveTrue()).thenReturn(List.of(client));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(clientRepository.search(null, pageable)).thenReturn(new PageImpl<>(List.of(client)));
         when(clientMapper.toResponse(client)).thenReturn(response);
 
-        List<ClientResponse> result = clientService.findAll();
+        Page<ClientResponse> result = clientService.findAll(null, pageable);
 
-        assertThat(result).hasSize(1).contains(response);
+        assertThat(result.getContent()).hasSize(1).contains(response);
     }
 
     @Test

@@ -20,6 +20,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,17 +51,18 @@ class QuoteServiceImplTest {
     // --- findAll ---
 
     @Test
-    void findAll_shouldReturnMappedList() {
+    void findAll_shouldReturnMappedPage() {
         LocalDate start = LocalDate.of(2026, 1, 1);
         LocalDate end = LocalDate.of(2026, 12, 31);
         Quote quote = new Quote();
         QuoteResponse response = dummyResponse();
-        when(quoteRepository.findByDateRange(start, end)).thenReturn(List.of(quote));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(quoteRepository.findByFilters(QuoteStatus.DRAFT, start, end, pageable)).thenReturn(new PageImpl<>(List.of(quote)));
         when(quoteMapper.toResponse(quote)).thenReturn(response);
 
-        List<QuoteResponse> result = quoteService.findAll(start, end);
+        Page<QuoteResponse> result = quoteService.findAll(QuoteStatus.DRAFT, start, end, pageable);
 
-        assertThat(result).hasSize(1).contains(response);
+        assertThat(result.getContent()).hasSize(1).contains(response);
     }
 
     // --- findById ---
