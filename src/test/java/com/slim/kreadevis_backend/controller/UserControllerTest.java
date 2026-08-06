@@ -15,6 +15,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
@@ -23,10 +24,12 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.hamcrest.Matchers.hasItem;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -36,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserControllerTest {
 
     @TestConfiguration
+    @EnableMethodSecurity
     static class TestSecurity {
         @Bean
         SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -99,5 +103,44 @@ class UserControllerTest {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("User not found: ghost"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getAll_shouldReturn403_whenNotAdmin() throws Exception {
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getAll_shouldReturn200_whenAdmin() throws Exception {
+        UserResponse user = new UserResponse(1L, "jdoe", "jdoe@example.com", Set.of("ROLE_USER"));
+        when(userService.findAll()).thenReturn(List.of(user));
+
+        mockMvc.perform(get("/api/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].login").value("jdoe"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void getById_shouldReturn403_whenNotAdmin() throws Exception {
+        mockMvc.perform(get("/api/users/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void delete_shouldReturn403_whenNotAdmin() throws Exception {
+        mockMvc.perform(delete("/api/users/1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void delete_shouldReturn204_whenAdmin() throws Exception {
+        mockMvc.perform(delete("/api/users/1"))
+                .andExpect(status().isNoContent());
     }
 }
