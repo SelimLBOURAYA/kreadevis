@@ -30,6 +30,9 @@ docker compose up -d       # PostgreSQL 17 on :5432
 ./mvnw spring-boot:run     # API on :8080
 ```
 
+OpenAPI spec: `GET /v3/api-docs` — interactive docs: `/swagger-ui.html` (dev only,
+disabled on the `prod` profile).
+
 ## Tests
 
 ```bash
@@ -47,7 +50,6 @@ docker compose up -d       # PostgreSQL 17 on :5432
 | `JWT_SECRET` | dev placeholder | JWT signing key — **set a real value outside dev** |
 | `DOC_LOGO_PATH` | `classpath:static/logo.png` | Logo used in PDFs |
 | `DOC_OUTPUT_DIR` | `/tmp/kreadevis/documents` | Generated documents directory |
-| `DOC_FACTURE_DIR` | `/tmp/kreadevis/factures` | Generated invoices directory |
 | `CORS_ORIGINS` | `http://localhost:4200` | Allowed frontend origins |
 
 ## Project layout

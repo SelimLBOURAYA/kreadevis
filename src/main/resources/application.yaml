@@ -21,6 +21,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 # --- App config ---
 app:
   jwt:
@@ -36,7 +40,6 @@ app:
   document:
     logo-path: ${DOC_LOGO_PATH:classpath:static/logo.png}
     output-dir: ${DOC_OUTPUT_DIR:/tmp/kreadevis/documents}
-    facture-dir: ${DOC_FACTURE_DIR:/tmp/kreadevis/factures}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
   email:
@@ -80,6 +83,11 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
 logging:
   level:
     com.slim: INFO
