@@ -41,7 +41,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | SB41 | chore/spring-boot-4-1         | ✅ terminé  | infra              |
 | 12b | feat/lot-12b-front-unblock     | ✅ terminé  | correctifs / API   |
 | 13  | feat/lot-13-pagination         | ✅ terminé  | API                |
-| 14  | feat/lot-14-api-hygiene        | ⬜ à faire  | qualité / API      |
+| 14  | feat/lot-14-api-hygiene        | ✅ terminé  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ⬜ à faire  | sécurité           |
 | 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
 | 17  | feat/lot-17-dockerization      | ⬜ à faire  | infra              |
@@ -745,10 +745,39 @@ Empêche un appel `?size=1000000` de saturer la base.
 
 ---
 
-## LOT 14 — Hygiène API & OpenAPI ⬜
+## LOT 14 — Hygiène API & OpenAPI ✅
 
 **Branche :** `feat/lot-14-api-hygiene`
 **Commit cible :** `feat(14): add openapi spec, cleanup api conventions`
+
+Réalisé :
+- `springdoc-openapi-starter-webmvc-ui` **3.1.0** ajouté (la version 2.x visée par la
+  spec initiale ne cible que Spring Boot 3 ; 3.x est la première ligne compatible
+  Spring Boot 4 — voir `docs/audits/lot-14.md`). `OpenApiConfig` (titre, version,
+  security scheme `bearerAuth` JWT). `/v3/api-docs` et `/swagger-ui/**` en `permitAll`
+  dans `SecurityConfig`. Profil `prod` : `springdoc.swagger-ui.enabled: false` **et**
+  `springdoc.api-docs.enabled: false` (durcissement au-delà du périmètre initial —
+  springdoc expose `/v3/api-docs` par défaut même Swagger UI désactivé).
+- Tous les `POST` de création (`Client`, `Address`, `Product`, `Professional`, `Quote`,
+  `QuoteItem.addItem`) renvoient **201 Created** + header `Location`, body DTO complet
+  conservé (décision utilisateur du 2026-08-06). `AuthController.login/register`,
+  `finalize/pending/cancel`, `import`, `send` restent en 200 (pas des créations de
+  ressource adressable).
+- Retrait de `@JsonIgnoreProperties` sur `Quote.client`, `Client.address`,
+  `Client.quotes`, `QuoteItem.product`, `QuoteItem.quote` — aucune entité n'est
+  sérialisée hors DTO. `@JsonIgnore` sur `User.password` conservé.
+- `Quote.client` et `Quote.createdBy` passés en `@ManyToOne(optional = false)` ;
+  changeset Liquibase `004-quote-fk-not-null` (NOT NULL sur `quotes.client_id` /
+  `quotes.created_by`).
+- Périmètre facturation supprimé : `QuoteDocumentController.getInvoicePdf`,
+  `PdfService.generateInvoicePdf`, variante `"FACTURE"` de `buildPdf`,
+  `AppProperties.DocumentConfig.factureDir`, `app.document.facture-dir` /
+  `DOC_FACTURE_DIR` (yaml + README).
+- Tests : `ClientControllerTest`/`ProductControllerTest`/`QuoteControllerTest` mis à
+  jour (201 + `Location`), `QuoteControllerTest.addItem_shouldReturn201` ajouté,
+  `OpenApiSmokeTest` (`GET /v3/api-docs` → 200, JSON OpenAPI valide),
+  `QuoteRepositoryTest` mis à jour (client obligatoire), `PdfServiceImplTest` réduit
+  (retrait des cas facture).
 
 ### Objectif
 Standardiser le contrat HTTP, exposer une spec consommable par le front Angular, et nettoyer les vestiges de couplage entité↔sérialisation.
