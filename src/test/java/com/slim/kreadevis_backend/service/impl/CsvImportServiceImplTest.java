@@ -1,6 +1,7 @@
 package com.slim.kreadevis_backend.service.impl;
 
 import com.slim.kreadevis_backend.config.CsvImportColumns;
+import com.slim.kreadevis_backend.config.CsvImportProperties;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult;
 import com.slim.kreadevis_backend.entity.Product;
 import com.slim.kreadevis_backend.entity.User;
@@ -15,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -40,7 +42,8 @@ class CsvImportServiceImplTest {
     void setUp() {
         CsvImportColumns defaultColumns = new CsvImportColumns(
                 "label", "description", "stockQuantity", "unitPrice", "vatRate", "referenceCode");
-        csvImportService = new CsvImportServiceImpl(productRepository, productMapper, defaultColumns, securityUtils);
+        CsvImportProperties properties = new CsvImportProperties(10_000, List.of("text/csv", "application/vnd.ms-excel"));
+        csvImportService = new CsvImportServiceImpl(productRepository, productMapper, defaultColumns, properties, securityUtils);
 
         User currentUser = new User();
         currentUser.setId(OWNER_ID);
@@ -260,6 +263,52 @@ class CsvImportServiceImplTest {
         assertThat(result.importedCount()).isEqualTo(2);
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0).lineNumber()).isEqualTo(3);
+    }
+
+    @Test
+    void importProducts_rejectsEmptyFile() {
+        MockMultipartFile file = new MockMultipartFile("file", "products.csv", "text/csv", new byte[0]);
+
+        assertThatThrownBy(() -> csvImportService.importProducts(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty file");
+    }
+
+    @Test
+    void importProducts_rejectsNonCsvExtension() {
+        MockMultipartFile file = new MockMultipartFile("file", "products.txt", "text/csv",
+                "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n".getBytes());
+
+        assertThatThrownBy(() -> csvImportService.importProducts(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only .csv files are accepted");
+    }
+
+    @Test
+    void importProducts_rejectsDisallowedContentType() {
+        MockMultipartFile file = new MockMultipartFile("file", "products.csv", "application/octet-stream",
+                "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n".getBytes());
+
+        assertThatThrownBy(() -> csvImportService.importProducts(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid content type");
+    }
+
+    @Test
+    void importProducts_rejectsTooManyRows() {
+        CsvImportProperties strictProperties = new CsvImportProperties(1, List.of("text/csv"));
+        csvImportService = new CsvImportServiceImpl(productRepository, productMapper,
+                new CsvImportColumns("label", "description", "stockQuantity", "unitPrice", "vatRate", "referenceCode"),
+                strictProperties, securityUtils);
+
+        String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
+                     "Robinet,Desc,5,85.0,20.0,REF-001\n" +
+                     "Tuyau,Desc,5,85.0,20.0,REF-002\n";
+        MockMultipartFile file = multipartFile(csv);
+
+        assertThatThrownBy(() -> csvImportService.importProducts(file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Too many rows");
     }
 
     private MockMultipartFile multipartFile(String csv) {
