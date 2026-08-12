@@ -11,14 +11,12 @@ import java.util.stream.Collectors;
 public class UserDetailsImpl implements UserDetails {
 
     private final Long id;
-    private final String login;
     private final String email;
     private final String password;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public UserDetailsImpl(User user) {
         this.id = user.getId();
-        this.login = user.getLogin();
         this.email = user.getEmail();
         this.password = user.getPassword();
         this.authorities = user.getAuthorities().stream()
@@ -32,7 +30,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public String getUsername() {
-        return login;
+        return email;
     }
 
     @Override

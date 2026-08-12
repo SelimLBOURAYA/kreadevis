@@ -3,12 +3,14 @@ package com.slim.kreadevis_backend.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slim.kreadevis_backend.dto.auth.AuthResponse;
 import com.slim.kreadevis_backend.dto.auth.LoginRequest;
+import com.slim.kreadevis_backend.dto.auth.RefreshRequest;
 import com.slim.kreadevis_backend.dto.auth.RegisterRequest;
 import com.slim.kreadevis_backend.security.JwtUtils;
 import com.slim.kreadevis_backend.security.UserDetailsServiceImpl;
 import com.slim.kreadevis_backend.service.AuthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
@@ -19,7 +21,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+// Servlet filters (rate-limiting, JWT auth) are disabled here: this slice tests the
+// controller's request/response mapping only. Filter behavior has its own dedicated
+// unit tests (RateLimitFilterTest, JwtAuthFilterTest).
 @WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -54,7 +60,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RegisterRequest("johndoe", "john@test.com", "password123"))))
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("johndoe", "john@test.com", "password123456"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-token"));
     }
@@ -63,7 +69,35 @@ class AuthControllerTest {
     void register_shouldReturn400_whenEmailInvalid() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RegisterRequest("johndoe", "not-an-email", "password123"))))
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("johndoe", "not-an-email", "password123456"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_shouldReturn400_whenPasswordTooShort() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("johndoe", "john@test.com", "short1"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void refresh_shouldReturn200WithNewTokens_whenTokenValid() throws Exception {
+        when(authService.refresh(any())).thenReturn(new AuthResponse("new-access-token", "new-refresh-token"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshRequest("old-refresh-token"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"));
+    }
+
+    @Test
+    void refresh_shouldReturn400_whenTokenBlank() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshRequest(""))))
                 .andExpect(status().isBadRequest());
     }
 }

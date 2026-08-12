@@ -51,6 +51,7 @@ class QuoteReadIntegrationTest {
     @Autowired private ProductRepository productRepository;
     @Autowired private QuoteRepository quoteRepository;
     @Autowired private QuoteItemRepository quoteItemRepository;
+    @Autowired private RefreshTokenRepository refreshTokenRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
     private String jwtToken;
@@ -136,6 +137,7 @@ class QuoteReadIntegrationTest {
         productRepository.deleteAll();
         clientRepository.deleteAll();
         addressRepository.deleteAll();
+        refreshTokenRepository.deleteAll(); // login() in setUp() issues one — clear before users
         userRepository.deleteAll();
         roleRepository.deleteAll();
     }

@@ -65,7 +65,7 @@ class AdminUserControllerTest {
     void createAdmin_shouldReturn401_whenUnauthenticated() throws Exception {
         mockMvc.perform(post("/api/admin/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123"))))
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123456"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -74,7 +74,7 @@ class AdminUserControllerTest {
     void createAdmin_shouldReturn403_whenNotAdmin() throws Exception {
         mockMvc.perform(post("/api/admin/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123"))))
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123456"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -86,7 +86,7 @@ class AdminUserControllerTest {
 
         mockMvc.perform(post("/api/admin/users")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123"))))
+                        .content(objectMapper.writeValueAsString(new RegisterRequest("newadmin", "newadmin@test.com", "password123456"))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/users/7"))
                 .andExpect(jsonPath("$.roles", org.hamcrest.Matchers.hasItem("ROLE_ADMIN")));

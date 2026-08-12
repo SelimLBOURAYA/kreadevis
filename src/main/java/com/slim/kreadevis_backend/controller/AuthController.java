@@ -2,6 +2,7 @@ package com.slim.kreadevis_backend.controller;
 
 import com.slim.kreadevis_backend.dto.auth.AuthResponse;
 import com.slim.kreadevis_backend.dto.auth.LoginRequest;
+import com.slim.kreadevis_backend.dto.auth.RefreshRequest;
 import com.slim.kreadevis_backend.dto.auth.RegisterRequest;
 import com.slim.kreadevis_backend.service.AuthService;
 import jakarta.validation.Valid;
@@ -24,5 +25,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refresh(request));
     }
 }
