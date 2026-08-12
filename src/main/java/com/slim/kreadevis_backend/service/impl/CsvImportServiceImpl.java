@@ -1,6 +1,7 @@
 package com.slim.kreadevis_backend.service.impl;
 
 import com.slim.kreadevis_backend.config.CsvImportColumns;
+import com.slim.kreadevis_backend.config.CsvImportProperties;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult;
 import com.slim.kreadevis_backend.dto.product.CsvImportResult.RowError;
 import com.slim.kreadevis_backend.dto.product.ProductResponse;
@@ -38,16 +39,19 @@ public class CsvImportServiceImpl implements CsvImportService {
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
     private final CsvImportColumns columns;
+    private final CsvImportProperties properties;
     private final SecurityUtils securityUtils;
     private final CSVFormat csvFormat;
 
     public CsvImportServiceImpl(ProductRepository productRepository,
                                 ProductMapper productMapper,
                                 CsvImportColumns columns,
+                                CsvImportProperties properties,
                                 SecurityUtils securityUtils) {
         this.productRepository = productRepository;
         this.productMapper = productMapper;
         this.columns = columns;
+        this.properties = properties;
         this.securityUtils = securityUtils;
         this.csvFormat = CSVFormat.DEFAULT.builder()
                 .setHeader()
@@ -74,6 +78,8 @@ public class CsvImportServiceImpl implements CsvImportService {
     @Override
     @Transactional
     public CsvImportResult importProducts(MultipartFile file) {
+        validateUpload(file);
+
         List<ProductResponse> imported = new ArrayList<>();
         List<RowError> errors = new ArrayList<>();
 
@@ -85,6 +91,10 @@ public class CsvImportServiceImpl implements CsvImportService {
 
             for (CSVRecord record : parser) {
                 int lineNumber = (int) record.getRecordNumber() + 1;
+                if (lineNumber - 1 > properties.maxRows()) {
+                    throw new IllegalArgumentException(
+                            "Too many rows: CSV exceeds the " + properties.maxRows() + " row limit");
+                }
                 processRecord(record, lineNumber, imported, errors);
             }
         } catch (IOException e) {
@@ -94,6 +104,21 @@ public class CsvImportServiceImpl implements CsvImportService {
         log.info("CSV import completed: {} imported, {} errors", imported.size(), errors.size());
 
         return new CsvImportResult(imported.size(), imported, errors, List.of());
+    }
+
+    private void validateUpload(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Empty file");
+        }
+
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
+            throw new IllegalArgumentException("Only .csv files are accepted");
+        }
+
+        if (!properties.allowedContentTypes().contains(file.getContentType())) {
+            throw new IllegalArgumentException("Invalid content type: " + file.getContentType());
+        }
     }
 
     private void validateColumns(Set<String> headerNames) {
