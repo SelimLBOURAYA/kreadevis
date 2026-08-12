@@ -115,7 +115,7 @@ public class CsvImportServiceImpl implements CsvImportService {
                                List<RowError> errors) {
         switch (parseRow(record, lineNumber)) {
             case ParseResult.Err(RowError err) -> errors.add(err);
-            case ParseResult.Ok(ProductRow row) -> persistOrUpdate(row, imported);
+            case ParseResult.Ok(ProductRow row) -> persistOrUpdate(row, lineNumber, imported, errors);
         }
     }
 
@@ -165,18 +165,28 @@ public class CsvImportServiceImpl implements CsvImportService {
         ));
     }
 
-    private void persistOrUpdate(ProductRow row, List<ProductResponse> imported) {
+    private void persistOrUpdate(ProductRow row, int lineNumber,
+                                 List<ProductResponse> imported,
+                                 List<RowError> errors) {
         User currentUser = securityUtils.getCurrentUser();
         Product product;
         if (row.referenceCode() != null) {
-            product = findOwnedByReferenceCode(row.referenceCode(), currentUser)
-                    .map(existing -> {
-                        existing.setLabel(row.label());
-                        existing.setDescription(row.description());
-                        existing.setStockQuantity(row.stockQuantity());
-                        existing.setUnitPrice(row.unitPrice());
-                        existing.setVatRate(row.vatRate());
-                        return existing;
+            // Single unscoped read: it answers both "does it exist" and "is it mine",
+            // which is what lets us tell an update apart from a conflict below.
+            Optional<Product> existing = productRepository.findByReferenceCodeAndActiveTrue(row.referenceCode());
+            if (existing.isPresent() && !isUsableBy(existing.get(), currentUser)) {
+                errors.add(new RowError(lineNumber,
+                        "Reference code already used: " + row.referenceCode()));
+                return;
+            }
+            product = existing
+                    .map(target -> {
+                        target.setLabel(row.label());
+                        target.setDescription(row.description());
+                        target.setStockQuantity(row.stockQuantity());
+                        target.setUnitPrice(row.unitPrice());
+                        target.setVatRate(row.vatRate());
+                        return target;
                     })
                     .orElseGet(() -> toEntity(row, currentUser));
         } else {
@@ -186,13 +196,14 @@ public class CsvImportServiceImpl implements CsvImportService {
         imported.add(productMapper.toResponse(saved));
     }
 
-    /** Admins can update any product by reference code; a regular user can only update their own (a matching code owned by someone else is treated as new). */
-    private Optional<Product> findOwnedByReferenceCode(String referenceCode, User currentUser) {
-        Optional<Product> existing = productRepository.findByReferenceCodeAndActiveTrue(referenceCode);
-        if (existing.isEmpty() || securityUtils.isAdmin()) {
-            return existing;
-        }
-        return existing.filter(product -> product.getCreatedBy().getId().equals(currentUser.getId()));
+    /**
+     * Admins can update any product by reference code; a regular user only their own.
+     * {@code reference_code} is globally unique, so a code owned by someone else cannot
+     * be re-created under the current user — the row is rejected rather than silently
+     * overwriting another user's product.
+     */
+    private boolean isUsableBy(Product product, User currentUser) {
+        return securityUtils.isAdmin() || product.getCreatedBy().getId().equals(currentUser.getId());
     }
 
     private Product toEntity(ProductRow row, User currentUser) {

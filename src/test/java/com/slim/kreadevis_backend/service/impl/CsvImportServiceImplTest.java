@@ -141,7 +141,7 @@ class CsvImportServiceImplTest {
     }
 
     @Test
-    void importProducts_createsNewProduct_whenReferenceCodeOwnedByAnotherUser() {
+    void importProducts_reportsRowError_whenReferenceCodeOwnedByAnotherUser() {
         String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
                      "New Owner Product,Desc,10,99.0,20.0,SHARED-REF\n";
         MockMultipartFile file = multipartFile(csv);
@@ -151,19 +151,39 @@ class CsvImportServiceImplTest {
         Product ownedByAnotherUser = new Product();
         ownedByAnotherUser.setCreatedBy(anotherUser);
         when(productRepository.findByReferenceCodeAndActiveTrue("SHARED-REF")).thenReturn(Optional.of(ownedByAnotherUser));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(productMapper.toResponse(any())).thenAnswer(inv -> null);
+
+        CsvImportResult result = csvImportService.importProducts(file);
+
+        // reference_code is globally unique: creating a duplicate would violate the
+        // constraint, so the row is rejected instead.
+        assertThat(result.importedCount()).isZero();
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0).message()).contains("Reference code already used: SHARED-REF");
+        // must not have mutated the other user's product
+        assertThat(ownedByAnotherUser.getLabel()).isNull();
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void importProducts_updatesProductOfAnotherUser_whenAdmin() {
+        String csv = "label,description,stockQuantity,unitPrice,vatRate,referenceCode\n" +
+                     "Admin Edit,Desc,10,99.0,20.0,SHARED-REF\n";
+        MockMultipartFile file = multipartFile(csv);
+
+        when(securityUtils.isAdmin()).thenReturn(true);
+        User anotherUser = new User();
+        anotherUser.setId(99L);
+        Product ownedByAnotherUser = new Product();
+        ownedByAnotherUser.setCreatedBy(anotherUser);
+        when(productRepository.findByReferenceCodeAndActiveTrue("SHARED-REF")).thenReturn(Optional.of(ownedByAnotherUser));
+        when(productRepository.save(ownedByAnotherUser)).thenReturn(ownedByAnotherUser);
+        when(productMapper.toResponse(ownedByAnotherUser)).thenAnswer(inv -> null);
 
         CsvImportResult result = csvImportService.importProducts(file);
 
         assertThat(result.importedCount()).isEqualTo(1);
         assertThat(result.errors()).isEmpty();
-        // must not have mutated the other user's product
-        assertThat(ownedByAnotherUser.getLabel()).isNull();
-        ArgumentCaptor<Product> savedCaptor = ArgumentCaptor.forClass(Product.class);
-        verify(productRepository).save(savedCaptor.capture());
-        assertThat(savedCaptor.getValue()).isNotSameAs(ownedByAnotherUser);
-        assertThat(savedCaptor.getValue().getCreatedBy().getId()).isEqualTo(OWNER_ID);
+        assertThat(ownedByAnotherUser.getLabel()).isEqualTo("Admin Edit");
     }
 
     @Test
