@@ -14,7 +14,14 @@ spring:
 app:
   jwt:
     secret: test-secret-key-that-is-at-least-256-bits-long-for-hs256-signing-algorithm
-    expiration-ms: 3600000
+    access-token-expiration-ms: 3600000
+    refresh-token-expiration-ms: 86400000
+  csv:
+    import:
+      max-rows: 10000
+      allowed-content-types:
+        - text/csv
+        - application/vnd.ms-excel
   email:
     enabled: true
     mailjet:
