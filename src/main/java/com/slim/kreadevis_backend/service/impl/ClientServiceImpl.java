@@ -26,9 +26,9 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public Page<ClientResponse> findAll(String search, Pageable pageable) {
-        Page<Client> clients = securityUtils.isAdmin()
-                ? clientRepository.search(search, pageable)
-                : clientRepository.searchByOwner(search, securityUtils.getCurrentUser().getId(), pageable);
+        Page<Client> clients = securityUtils.resolveOwned(
+                () -> clientRepository.search(search, pageable),
+                ownerId -> clientRepository.searchByOwner(search, ownerId, pageable));
         return clients.map(clientMapper::toResponse);
     }
 
@@ -66,11 +66,9 @@ public class ClientServiceImpl implements ClientService {
 
     /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else only sees their own clients. */
     private Client getOwnedClient(Long id) {
-        if (securityUtils.isAdmin()) {
-            return clientRepository.findByIdAndActiveTrue(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
-        }
-        return clientRepository.findByIdAndActiveTrueAndCreatedById(id, securityUtils.getCurrentUser().getId())
+        return securityUtils.resolveOwned(
+                        () -> clientRepository.findByIdAndActiveTrue(id),
+                        ownerId -> clientRepository.findByIdAndActiveTrueAndCreatedById(id, ownerId))
                 .orElseThrow(() -> new EntityNotFoundException("Client not found: " + id));
     }
 }

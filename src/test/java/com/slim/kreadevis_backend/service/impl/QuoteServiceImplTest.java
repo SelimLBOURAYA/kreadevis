@@ -11,6 +11,7 @@ import com.slim.kreadevis_backend.mapper.QuoteMapper;
 import com.slim.kreadevis_backend.repository.ClientRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
 import com.slim.kreadevis_backend.security.SecurityUtils;
+import com.slim.kreadevis_backend.security.SecurityUtilsTestSupport;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ class QuoteServiceImplTest {
         currentUser = new User();
         currentUser.setId(OWNER_ID);
         currentUser.setLogin("testuser");
+        SecurityUtilsTestSupport.wireResolveOwned(securityUtils);
     }
 
     // --- findAll ---
