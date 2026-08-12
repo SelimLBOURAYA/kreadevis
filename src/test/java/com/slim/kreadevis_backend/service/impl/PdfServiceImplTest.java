@@ -4,6 +4,7 @@ import com.slim.kreadevis_backend.config.AppProperties;
 import com.slim.kreadevis_backend.entity.*;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
 import com.slim.kreadevis_backend.security.SecurityUtils;
+import com.slim.kreadevis_backend.security.SecurityUtilsTestSupport;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class PdfServiceImplTest {
         currentUser.setId(OWNER_ID);
         lenient().when(securityUtils.isAdmin()).thenReturn(false);
         lenient().when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        SecurityUtilsTestSupport.wireResolveOwned(securityUtils);
     }
 
     @Test

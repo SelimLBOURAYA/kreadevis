@@ -26,9 +26,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Page<ProductResponse> findAll(String search, Pageable pageable) {
-        Page<Product> products = securityUtils.isAdmin()
-                ? productRepository.search(search, pageable)
-                : productRepository.searchByOwner(search, securityUtils.getCurrentUser().getId(), pageable);
+        Page<Product> products = securityUtils.resolveOwned(
+                () -> productRepository.search(search, pageable),
+                ownerId -> productRepository.searchByOwner(search, ownerId, pageable));
         return products.map(productMapper::toResponse);
     }
 
@@ -70,11 +70,9 @@ public class ProductServiceImpl implements ProductService {
 
     /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else only sees their own products. */
     private Product getOwnedProduct(Long id) {
-        if (securityUtils.isAdmin()) {
-            return productRepository.findByIdAndActiveTrue(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
-        }
-        return productRepository.findByIdAndActiveTrueAndCreatedById(id, securityUtils.getCurrentUser().getId())
+        return securityUtils.resolveOwned(
+                        () -> productRepository.findByIdAndActiveTrue(id),
+                        ownerId -> productRepository.findByIdAndActiveTrueAndCreatedById(id, ownerId))
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
     }
 }

@@ -42,11 +42,10 @@ public class PdfServiceImpl implements PdfService {
     @Override
     @Transactional(readOnly = true)
     public byte[] generateQuotePdf(Long quoteId) {
-        Quote quote = securityUtils.isAdmin()
-                ? quoteRepository.findByIdAndActiveTrue(quoteId)
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
-                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.resolveOwned(
+                        () -> quoteRepository.findByIdAndActiveTrue(quoteId),
+                        ownerId -> quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, ownerId))
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
         return buildPdf(quote);
     }
 

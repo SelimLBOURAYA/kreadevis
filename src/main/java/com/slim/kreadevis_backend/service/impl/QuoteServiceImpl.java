@@ -36,9 +36,9 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional(readOnly = true)
     public Page<QuoteResponse> findAll(QuoteStatus status, LocalDate startDate, LocalDate endDate, Pageable pageable) {
-        Page<Quote> quotes = securityUtils.isAdmin()
-                ? quoteRepository.findByFilters(status, startDate, endDate, pageable)
-                : quoteRepository.findByFiltersForOwner(securityUtils.getCurrentUser().getId(), status, startDate, endDate, pageable);
+        Page<Quote> quotes = securityUtils.resolveOwned(
+                () -> quoteRepository.findByFilters(status, startDate, endDate, pageable),
+                ownerId -> quoteRepository.findByFiltersForOwner(ownerId, status, startDate, endDate, pageable));
         return quotes.map(quoteMapper::toResponse);
     }
 
@@ -51,18 +51,18 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional(readOnly = true)
     public List<QuoteResponse> findByClientId(Long clientId) {
-        List<Quote> quotes = securityUtils.isAdmin()
-                ? quoteRepository.findByClientIdAndActiveTrue(clientId)
-                : quoteRepository.findByClientIdAndActiveTrueAndCreatedById(clientId, securityUtils.getCurrentUser().getId());
+        List<Quote> quotes = securityUtils.resolveOwned(
+                () -> quoteRepository.findByClientIdAndActiveTrue(clientId),
+                ownerId -> quoteRepository.findByClientIdAndActiveTrueAndCreatedById(clientId, ownerId));
         return quotes.stream().map(quoteMapper::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public QuoteResponse findByReferenceCode(String referenceCode) {
-        var quote = securityUtils.isAdmin()
-                ? quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode)
-                : quoteRepository.findByReferenceCodeAndActiveTrueAndCreatedById(referenceCode, securityUtils.getCurrentUser().getId());
+        var quote = securityUtils.resolveOwned(
+                () -> quoteRepository.findByReferenceCodeAndActiveTrue(referenceCode),
+                ownerId -> quoteRepository.findByReferenceCodeAndActiveTrueAndCreatedById(referenceCode, ownerId));
         return quoteMapper.toResponse(quote.orElseThrow(() -> new EntityNotFoundException("Quote not found: " + referenceCode)));
     }
 
@@ -70,11 +70,11 @@ public class QuoteServiceImpl implements QuoteService {
     @Transactional
     public QuoteResponse create(QuoteRequest request) {
         User currentUser = securityUtils.getCurrentUser();
-        Client client = securityUtils.isAdmin()
-                ? clientRepository.findByIdAndActiveTrue(request.clientId())
-                        .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()))
-                : clientRepository.findByIdAndActiveTrueAndCreatedById(request.clientId(), currentUser.getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()));
+        var foundClient = securityUtils.resolveOwned(
+                () -> clientRepository.findByIdAndActiveTrue(request.clientId()),
+                ownerId -> clientRepository.findByIdAndActiveTrueAndCreatedById(request.clientId(), ownerId));
+        Client client = foundClient
+                .orElseThrow(() -> new EntityNotFoundException("Client not found: " + request.clientId()));
         Quote quote = Quote.builder()
                 .client(client)
                 .createdBy(currentUser)
@@ -127,11 +127,10 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     @Transactional
     public void delete(Long id) {
-        Quote quote = securityUtils.isAdmin()
-                ? quoteRepository.findById(id)
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id))
-                : quoteRepository.findByIdAndCreatedById(id, securityUtils.getCurrentUser().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
+        Quote quote = securityUtils.resolveOwned(
+                        () -> quoteRepository.findById(id),
+                        ownerId -> quoteRepository.findByIdAndCreatedById(id, ownerId))
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
         if (quote.getStatus() == QuoteStatus.FINALIZED) {
             throw new IllegalStateException("Cannot delete a finalized quote");
         }
@@ -142,11 +141,9 @@ public class QuoteServiceImpl implements QuoteService {
 
     /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else only sees their own quotes. */
     private Quote getOwnedQuote(Long id) {
-        if (securityUtils.isAdmin()) {
-            return quoteRepository.findByIdAndActiveTrue(id)
-                    .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
-        }
-        return quoteRepository.findByIdAndActiveTrueAndCreatedById(id, securityUtils.getCurrentUser().getId())
+        return securityUtils.resolveOwned(
+                        () -> quoteRepository.findByIdAndActiveTrue(id),
+                        ownerId -> quoteRepository.findByIdAndActiveTrueAndCreatedById(id, ownerId))
                 .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + id));
     }
 

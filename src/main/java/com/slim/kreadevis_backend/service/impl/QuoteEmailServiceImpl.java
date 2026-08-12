@@ -57,11 +57,10 @@ public class QuoteEmailServiceImpl implements QuoteEmailService {
             throw new IllegalStateException("Email sending is disabled");
         }
 
-        Quote quote = securityUtils.isAdmin()
-                ? quoteRepository.findByIdAndActiveTrue(quoteId)
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
-                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.resolveOwned(
+                        () -> quoteRepository.findByIdAndActiveTrue(quoteId),
+                        ownerId -> quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, ownerId))
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
 
         String recipient = resolveRecipient(quote, request);
 

@@ -10,6 +10,7 @@ import com.slim.kreadevis_backend.entity.User;
 import com.slim.kreadevis_backend.exception.UnprocessableEntityException;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
 import com.slim.kreadevis_backend.security.SecurityUtils;
+import com.slim.kreadevis_backend.security.SecurityUtilsTestSupport;
 import com.slim.kreadevis_backend.service.EmailService;
 import com.slim.kreadevis_backend.service.PdfService;
 import jakarta.persistence.EntityNotFoundException;
@@ -49,6 +50,7 @@ class QuoteEmailServiceImplTest {
         currentUser.setId(OWNER_ID);
         lenient().when(securityUtils.isAdmin()).thenReturn(false);
         lenient().when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        SecurityUtilsTestSupport.wireResolveOwned(securityUtils);
     }
 
     @AfterEach

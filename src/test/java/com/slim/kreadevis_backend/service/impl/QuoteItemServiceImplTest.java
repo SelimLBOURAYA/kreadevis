@@ -12,6 +12,7 @@ import com.slim.kreadevis_backend.repository.ProductRepository;
 import com.slim.kreadevis_backend.repository.QuoteItemRepository;
 import com.slim.kreadevis_backend.repository.QuoteRepository;
 import com.slim.kreadevis_backend.security.SecurityUtils;
+import com.slim.kreadevis_backend.security.SecurityUtilsTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,7 @@ class QuoteItemServiceImplTest {
         currentUser.setId(OWNER_ID);
         when(securityUtils.isAdmin()).thenReturn(false);
         when(securityUtils.getCurrentUser()).thenReturn(currentUser);
+        SecurityUtilsTestSupport.wireResolveOwned(securityUtils);
     }
 
     // --- status guards ---

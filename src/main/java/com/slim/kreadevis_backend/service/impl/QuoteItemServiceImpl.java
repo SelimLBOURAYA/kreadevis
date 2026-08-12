@@ -96,11 +96,10 @@ public class QuoteItemServiceImpl implements QuoteItemService {
     }
 
     private Quote loadModifiableQuote(Long quoteId) {
-        Quote quote = securityUtils.isAdmin()
-                ? quoteRepository.findByIdAndActiveTrue(quoteId)
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId))
-                : quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, securityUtils.getCurrentUser().getId())
-                        .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
+        Quote quote = securityUtils.resolveOwned(
+                        () -> quoteRepository.findByIdAndActiveTrue(quoteId),
+                        ownerId -> quoteRepository.findByIdAndActiveTrueAndCreatedById(quoteId, ownerId))
+                .orElseThrow(() -> new EntityNotFoundException("Quote not found: " + quoteId));
         if (LOCKED_STATUSES.contains(quote.getStatus())) {
             throw new IllegalStateException(
                     "Cannot modify items of a quote with status " + quote.getStatus());
@@ -110,11 +109,9 @@ public class QuoteItemServiceImpl implements QuoteItemService {
 
     /** Owner-scoped lookup: ROLE_ADMIN bypasses the ownership filter, everyone else can only use their own products. */
     private Product getOwnedProduct(Long productId) {
-        if (securityUtils.isAdmin()) {
-            return productRepository.findByIdAndActiveTrue(productId)
-                    .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
-        }
-        return productRepository.findByIdAndActiveTrueAndCreatedById(productId, securityUtils.getCurrentUser().getId())
+        return securityUtils.resolveOwned(
+                        () -> productRepository.findByIdAndActiveTrue(productId),
+                        ownerId -> productRepository.findByIdAndActiveTrueAndCreatedById(productId, ownerId))
                 .orElseThrow(() -> new EntityNotFoundException("Product not found: " + productId));
     }
 }
