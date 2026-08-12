@@ -4,7 +4,7 @@ spring:
   datasource:
     url: ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/app1db}
     username: ${DATASOURCE_USERNAME:app1user}
-    password: ${DATASOURCE_PASSWORD:app1pass}
+    password: ${DATASOURCE_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,6 +17,10 @@ spring:
       pageable:
         default-page-size: 20
         max-page-size: 100
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -28,20 +32,24 @@ springdoc:
 # --- App config ---
 app:
   jwt:
-    secret: ${JWT_SECRET:changeme-256-bit-secret-key}
+    secret: ${JWT_SECRET}
     access-token-expiration-ms: 3600000
     refresh-token-expiration-ms: 86400000
   company:
-    name: "BMI PLOMBERIE CHAUFFAGE SALLE DE BAIN"
-    address: ""
-    phone: ""
-    email: ""
-    siren: "893774851"
+    name: ${COMPANY_NAME:Your Company}
+    address: ${COMPANY_ADDRESS:}
+    phone: ${COMPANY_PHONE:}
+    email: ${COMPANY_EMAIL:}
+    siren: ${COMPANY_SIREN:}
   document:
     logo-path: ${DOC_LOGO_PATH:classpath:static/logo.png}
     output-dir: ${DOC_OUTPUT_DIR:/tmp/kreadevis/documents}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+  rate-limit:
+    auth:
+      capacity: 5
+      window-seconds: 60
   email:
     enabled: ${EMAIL_ENABLED:true}
     mailjet:
@@ -53,6 +61,10 @@ app:
       name: ${EMAIL_SENDER_NAME:Kreadevis}
   csv:
     import:
+      max-rows: 10000
+      allowed-content-types:
+        - text/csv
+        - application/vnd.ms-excel
       columns:
         label: label
         description: description

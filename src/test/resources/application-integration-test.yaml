@@ -31,6 +31,12 @@ app:
     output-dir: /tmp/kreadevis-test/documents
   cors:
     allowed-origins: http://localhost:4200
+  rate-limit:
+    auth:
+      # High enough that integration tests sharing a cached Spring context never trip
+      # each other's /api/auth/** bucket. RateLimitFilterTest exercises the real 5/min cap.
+      capacity: 1000
+      window-seconds: 60
   email:
     enabled: true
     mailjet:
@@ -42,6 +48,10 @@ app:
       name: Kreadevis Test
   csv:
     import:
+      max-rows: 10000
+      allowed-content-types:
+        - text/csv
+        - application/vnd.ms-excel
       columns:
         label: label
         description: description
