@@ -121,14 +121,15 @@ At every session startup, the agent (Claude Code or other) MUST silently:
 
 1. Read the project's `CONVENTIONS.md` (versioned copy of this file — cross-cutting rules) then `CLAUDE.md` — stack, architecture, project-specific secrets, documents census
 2. Read the lots file (`lots.md` / `LOTS.md` / `dev-plan.md`) if present — specifications and status
-3. `git log --oneline -10`
-4. `git status`
-5. `git branch --show-current`
+3. **Identify the project's skills**: note every skill listed in `CLAUDE.md`'s "Skills" table — its name, trigger condition, and any gate it forms (e.g., `lot-test → lot-audit → lot-ship`). These skills MUST be invoked via the `Skill` tool at their trigger moment (§13).
+4. `git log --oneline -10`
+5. `git status`
+6. `git branch --show-current`
 
 Then summarize in **exactly 3 lines**:
 - **Current lot**: which lot is active or next
 - **State**: what is done, what is in progress, any uncommitted work
-- **Next action**: the first thing about to be done
+- **Next action**: the first thing about to be done, including which skill to invoke next
 
 Do not start the user's request before this sequence completes.
 
@@ -145,6 +146,7 @@ Before staging or committing, the agent MUST:
 3. **Confirm**: commit message in English, Conventional Commits format (`<type>(<scope>): <message>`), no ambiguous non-ASCII character (em dash U+2014 → use en dash U+2013 for fallbacks and separators)
 4. **Validation gate green** — exact command defined in the project `CLAUDE.md` (`./mvnw verify`, `npm test`, etc.)
 5. **Mirror & copies check** (§12): if `CLAUDE.md` or `AGENTS.md` is in the staged diff, `cmp CLAUDE.md AGENTS.md` MUST be silent; if `CONVENTIONS.md` is staged, it MUST be identical to the master `~/.claude/coding-conventions.md`
+6. **Skill deliverables**: if the project defines a skill gate (LOTD or equivalent) and the branch matches a lot/ticket pattern (`feat/lot-*`), verify that the current step's skill deliverable exists — e.g., `docs/audits/lot-XX.md` for `lot-audit`. A missing deliverable blocks the commit. If unsure which step you are at, invoke the next ungated skill to find out.
 
 **Why**: in-session context compression may demote these rules. This section stays in always-loaded docs and MUST be re-read before every commit. Past violations (French commit messages, rule drift, em dash in templates) confirmed that without an explicit reminder, the agent drifts.
 
@@ -209,3 +211,21 @@ After any edit to the master `~/.claude/coding-conventions.md`:
 2. Commit in each affected repo: `chore: sync CONVENTIONS.md with master`.
 
 The reverse path is forbidden: never edit a project's `CONVENTIONS.md` directly — edit the master, then propagate.
+
+---
+
+## 13. Skill invocation (all projects)
+
+When a project defines **skills** in its `CLAUDE.md` (typically in a "Skills" table with trigger conditions), the agent MUST invoke them via the **`Skill` tool** at the prescribed moments. A skill is a packaged set of instructions — invoking it loads its detailed procedure into the agent's context. The one-line description in `CLAUDE.md` is a **reminder**, not a substitute for the skill file.
+
+### Why
+
+Skills contain **detailed checklists, matrices, and procedures** that the summary table in `CLAUDE.md` does not capture. Executing a skill "from memory" without invoking the `Skill` tool skips these details. Past sessions on kreadevis-backend confirmed that the agent misses mandatory steps (business-rule test matrix, JaCoCo HTML report inspection, security-review subagent launch, architecture audit checklist, audit report writing) when it does not load the skill file.
+
+### How to apply
+
+- **Identify the gate**: read the project's `CLAUDE.md` "Skills" table. If it defines a gate (e.g., `lot-test → lot-audit → lot-ship`), these steps are **mandatory in order**.
+- **Invoke at the trigger moment**: when a skill's trigger condition is met (e.g., "lot code complete" for `lot-test`, "after lot-test" for `lot-audit`), invoke `Skill` with that skill name **before** doing any of the work the skill covers.
+- **Never skip a gate step**: each lot/ticket gets its own invocation of every gate skill, even if the previous lot passed. A green `lot-audit` on lot 15 does not excuse skipping it on lot 16.
+- **Skill instructions take precedence**: when a loaded skill contradicts the agent's default approach, the skill wins. The skill file is the procedure; the agent's memory is fallible.
+- **Deliverables are proof**: a gate skill produces a deliverable (e.g., `docs/audits/lot-XX.md` for `lot-audit`). A missing deliverable means the skill was not invoked — the pre-commit gate (§10 item 6) blocks the commit.
