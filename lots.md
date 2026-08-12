@@ -43,7 +43,7 @@ Le **lot 9** initialement prévu comme "tests à écrire" est redéfini en **inf
 | 13  | feat/lot-13-pagination         | ✅ terminé  | API                |
 | 14  | feat/lot-14-api-hygiene        | ✅ terminé  | qualité / API      |
 | 15  | feat/lot-15-rbac-ownership     | ✅ terminé  | sécurité           |
-| 16  | feat/lot-16-security-hardening | ⬜ à faire  | sécurité           |
+| 16  | feat/lot-16-security-hardening | ✅ terminé  | sécurité           |
 | 17  | feat/lot-17-dockerization      | ⬜ à faire  | infra              |
 | 18  | feat/lot-18-client-embedded-address | ⬜ optionnel | API           |
 
@@ -881,16 +881,25 @@ détaillé dans le rapport d'audit).
 
 ---
 
-## LOT 16 — Durcissement sécurité ⬜
+## LOT 16 — Durcissement sécurité ✅
 
 **Branche :** `feat/lot-16-security-hardening`
-**Commits cibles :**
-- `feat(16): wire cors configuration source`
-- `feat(16): fail fast on missing secrets via @Validated properties`
-- `feat(16): rate-limit auth endpoints`
+**Commits :**
+- `chore(16): add bucket4j dependency`
+- `feat(16): fail fast on missing secrets and externalize company identity`
+- `feat(16): harden cors, rate-limit auth endpoints and clean up security filter chain`
 - `feat(16): enforce csv upload size and mime checks`
 - `feat(16): return 401 instead of 500 on stale jwt subject`
-- `feat(16): add refresh token endpoint`
+- `feat(16): add refresh token endpoint and align jwt identity on email`
+- `docs(16): record review outcomes in the audit report`
+
+**Fait (2026-08-12)** — voir `docs/audits/lot-16.md`. Décisions prises avec l'utilisateur
+avant l'implémentation (rate-limit Bucket4j en mémoire faute d'infra Redis, refresh
+token avec nouvelle table dédiée, HIBP hors périmètre, identifiant canonique aligné
+sur `email`). Écart notable par rapport au plan : `RateLimitFilter` lit sa config via
+`@Value` plutôt que `@ConfigurationProperties`, car ce dernier n'est pas résolu dans les
+contextes `@WebMvcTest` qui auto-détectent pourtant les beans `Filter` — détail dans
+`security.md`.
 
 ### Objectif
 Appliquer les mesures de durcissement décrites en détail dans `security.md`. Ce lot ne change pas la logique métier mais ferme les angles d'attaque connus.

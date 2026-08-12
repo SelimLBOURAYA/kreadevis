@@ -414,16 +414,25 @@ Pas dans le périmètre actuel, mais à prévoir :
 
 ## Récapitulatif des actions par lot
 
-| Mesure | Lot | Référence section |
-|---|---|---|
-| Fail-fast sur secrets, `.env.example`, `@Validated` | 16 | §1 |
-| `CorsConfigurationSource` câblé | 16 | §2 |
-| Bucket4j rate-limit `/api/auth/**` | 16 | §3 |
-| Limites multipart + validation CSV | 16 | §4 |
-| BCrypt cost factor 12, password min 12 | 16 | §5 |
-| 401 propre dans `JwtAuthFilter` | 16 | §5 (session) |
-| Refresh token endpoint | 16 | §5 (session) |
-| RBAC + Ownership (`@PreAuthorize`, scoping) | 15 | §5 (permissions) |
+| Mesure | Lot | État | Référence section |
+|---|---|---|---|
+| Fail-fast sur secrets, `.env.example`, `@Validated` | 16 | ✅ | §1 |
+| `CorsConfigurationSource` câblé et durci | 16 | ✅ | §2 |
+| Bucket4j rate-limit `/api/auth/**` | 16 | ✅ | §3 |
+| Limites multipart + validation CSV | 16 | ✅ | §4 |
+| BCrypt cost factor 12, password min 12 | 16 | ✅ | §5 |
+| 401 propre dans `JwtAuthFilter` | 16 | ✅ | §5 (session) |
+| Refresh token endpoint | 16 | ✅ | §5 (session) |
+| Identité société externalisée (`app.company.*` via env) | 16 | ✅ | §1 |
+| Nettoyage `SecurityConfig` (`/actuator/**` retiré) | 16 | ✅ | §2 |
+| Identifiant canonique JWT aligné sur `email` | 16 | ✅ | §5 (session) |
+| RBAC + Ownership (`@PreAuthorize`, scoping) | 15 | ✅ | §5 (permissions) |
+
+### Écarts entre le plan initial et l'implémentation
+
+- **Rate-limit configurable, pas figé en dur** : `RateLimitFilter` lit `app.rate-limit.auth.capacity` / `.window-seconds` via `@Value` (défauts 5/60s) plutôt qu'une constante `Bandwidth.simple(5, Duration.ofMinutes(1))` codée en dur. Raison : `@ConfigurationProperties` n'est pas résolu dans les contextes `@WebMvcTest` (slices), qui auto-détectent pourtant les beans `Filter` — un `RateLimitFilter` dépendant d'un bean `@ConfigurationProperties` casse ces slices avec `NoSuchBeanDefinitionException`. `@Value` avec valeur par défaut reste résolu dans tous les contextes. Le profil `integration-test` relève la capacité à 1000/min pour que les tests d'intégration partageant un contexte Spring en cache ne se marchent pas dessus.
+- **Refresh token avec rotation** : chaque appel à `/api/auth/refresh` révoque le token présenté et en émet un nouveau (à usage unique), au-delà du minimum "stocké en DB, hashé, révocable" du plan initial. Stockage : SHA-256 hex du token brut (aléatoire, 32 octets, base64url) en colonne `token_hash` unique — pas de salt nécessaire vu l'entropie de la source.
+- **Vérification HIBP non implémentée** (§5, marquée optionnelle dans le plan) — reste hors périmètre du lot 16, à réévaluer si le besoin se confirme.
 
 ---
 
