@@ -27,7 +27,7 @@ Verified during this audit (all owner-scoped, no bypass found outside the
 - `ClientServiceImpl` / `ProductServiceImpl`: findAll, findById, update, delete.
 - `QuoteItemServiceImpl`: quote lookup (`loadModifiableQuote`) and product lookup (`getOwnedProduct`) for addItem/updateItem/deleteItem.
 - `PdfServiceImpl.generateQuotePdf`, `QuoteEmailServiceImpl.sendQuoteToClient` — both were still using the unscoped `findByIdAndActiveTrue` after the first two commits; fixed in the third commit (`4ac6cc2`).
-- `CsvImportServiceImpl` — reference-code lookup on import now checks `createdBy` for non-admins; a reference-code collision with another user's product creates a new product instead of overwriting theirs.
+- `CsvImportServiceImpl` — reference-code lookup on import now checks `createdBy` for non-admins. A collision with another user's reference code is **rejected as a row-level error**: `reference_code` carries a global unique constraint (`uq_products_reference_code`), so the initial "create it as a new product" fallback would have violated that constraint and surfaced as a 500. Found during PR #26 review; the unit test mocked `save`, so the DB constraint was never exercised.
 - `UserController` — `/me` stays self-service (no `@PreAuthorize` needed, scoped by JWT identity); `getAll`/`getById`/`delete` gated `hasRole('ADMIN')`.
 - `AdminUserController` (`POST /api/admin/users`) — class-level `@PreAuthorize("hasRole('ADMIN')")`, creates `ROLE_ADMIN` users only (public registration still only grants `ROLE_USER`).
 - 404 vs 403: every owner-scoped lookup throws `EntityNotFoundException` (→ 404) rather than an authorization exception when the resource belongs to another user — matches the OWASP guidance in the lot spec.
@@ -47,7 +47,7 @@ Verified during this audit (all owner-scoped, no bypass found outside the
 ## Architecture
 | Severity | Location | Finding | Action |
 |----------|----------|---------|--------|
-| Info | `service/impl/*ServiceImpl.java` | The `securityUtils.isAdmin() ? unscoped : scoped` ternary is duplicated across 8 services/8+ call sites. | Optional follow-up: a small generic helper on `SecurityUtils` (e.g. `<T> T resolveOwned(Supplier<Optional<T>> admin, Supplier<Optional<T>> scoped)`) could collapse the duplication — not urgent, current form is readable and each call site's repository pair is easy to audit individually. |
+| Info | `service/impl/*ServiceImpl.java` | The `securityUtils.isAdmin() ? unscoped : scoped` ternary was duplicated across 8 services / 12 call sites. | **Resolved** (PR #26 review) — extracted into `SecurityUtils.resolveOwned(Supplier<T>, Function<Long, T>)`, a single decision point. Accepted trade-off: `SecurityUtils` is mocked in unit tests, so `resolveOwned` has to be re-wired through `SecurityUtilsTestSupport.wireResolveOwned()` — one test shim against 12 production ternaries. |
 
 - Layering respected: controllers stay thin, business logic in services, persistence in repositories.
 - `SecurityUtils` is the single `getCurrentUser()`/`isAdmin()` source of truth now — the duplicate copy in `QuoteServiceImpl` was removed as part of this lot (first commit's follow-up).
@@ -59,7 +59,8 @@ Verified during this audit (all owner-scoped, no bypass found outside the
 ## Lot-specific notes
 
 - **Scope note vs `lots.md`**: the lot 15 spec explicitly scopes "services `findAll`/`findById`" for read filtering, but the stated objective ("un utilisateur ne voit et **ne modifie** que ses propres ressources") requires the same scoping on mutations. This audit therefore treats the PDF/email/CSV-import/quote-item fixes in commit `4ac6cc2` as in-scope closures of the same objective, not scope creep — leaving them unscoped would have been a direct IDOR (a user finalizing/cancelling/downloading/emailing another user's quote by guessing the id).
-- `./mvnw verify`: green, 161 tests, JaCoCo gate passed (see `lot-test` step).
+- `./mvnw verify`: green, 162 tests, JaCoCo gate passed (see `lot-test` step).
+- **Product reference codes stay globally unique.** Products are per-user (no sharing), so scoping `reference_code` uniqueness to `(created_by, reference_code)` was considered and deliberately not done in this lot — decision 2026-08-06. Consequence: two users cannot use the same reference code, and a CSV row hitting a foreign code gets an explicit error. Revisit if per-user reference namespaces become a requirement.
 - Postman cross-account scenario from the lot spec (admin + user1 + user2, full cross-cutting check) is a manual QA step — not automated in this repo's test suite style (all existing controller tests are `@WebMvcTest` with mocked services). Recommend running it manually before merge if this ships to a shared environment.
 
 ## Recommended next steps
