@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/changes/004-quote-fk-not-null.yaml
   - include:
       file: db/changelog/changes/005-client-product-ownership.yaml
+  - include:
+      file: db/changelog/changes/006-refresh-tokens.yaml
