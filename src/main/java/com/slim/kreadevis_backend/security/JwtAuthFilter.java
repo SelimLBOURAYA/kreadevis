@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -34,7 +35,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = extractToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
             String username = jwtUtils.getSubjectFromToken(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            UserDetails userDetails;
+            try {
+                userDetails = userDetailsService.loadUserByUsername(username);
+            } catch (UsernameNotFoundException e) {
+                // Token signature is valid but the subject no longer exists (deleted/deactivated
+                // user) — an authentication failure, not a server error. Short-circuit with 401
+                // instead of letting it propagate to GlobalExceptionHandler's generic 500.
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unknown or inactive user");
+                return;
+            }
             var auth = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(auth);
