@@ -195,7 +195,7 @@ Every project MUST have, at the repo root:
 
 ### Documents census (frozen requirement)
 
-`CLAUDE.md` MUST contain a `## Project documents` section listing **every useful document** of the project: the mandatory set above, the skills (`skill/*/SKILL.md`), the audit reports (`docs/audits/`), and any project-specific doc (`security.md`, prompt files…). Any document added to the project is added to the census **in the same commit**. Because `AGENTS.md` mirrors `CLAUDE.md`, the census is guaranteed identical in both.
+`CLAUDE.md` MUST contain a `## Project documents` section listing **every useful document** of the project: the mandatory set above, the skills (`.claude/skills/*/SKILL.md` — the directory the Claude Code harness scans for project-scoped skills, versioned in the repo like any other project document, never stored outside the project or shared globally), the audit reports (`docs/audits/`), and any project-specific doc (`security.md`, prompt files…). Any document added to the project is added to the census **in the same commit**. Because `AGENTS.md` mirrors `CLAUDE.md`, the census is guaranteed identical in both.
 
 ### Mirror invariant `AGENTS.md` = `CLAUDE.md`
 
