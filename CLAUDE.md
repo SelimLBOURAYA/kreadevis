@@ -41,12 +41,16 @@ Quote-authoring application — migration of the legacy `kreadevis` (Spring Boot
 
 | # | Skill | File | Trigger |
 |---|-------|------|---------|
-| 1 | **sprint** | `skill/sprint/SKILL.md` | Start or continue a full sprint of chained lots. |
-| 2 | **lot-test** | `skill/lot-test/SKILL.md` | Lot code complete — tests with coverage above the JaCoCo gate. |
-| 3 | **lot-audit** | `skill/lot-audit/SKILL.md` | After `lot-test` — security / performance / architecture audit. |
-| 4 | **lot-ship** | `skill/lot-ship/SKILL.md` | After `lot-audit` with no Critical — push + PR. |
-| 5 | **harness-sync** | `skill/harness-sync/SKILL.md` | Docs/harness drifted from code, or harness update/improvement requested. |
-| 6 | **dep-update** | `skill/dep-update/SKILL.md` | Before a PR or on demand — Maven dependency refresh (patch/minor auto, major on approval). |
+| 1 | **sprint** | `.claude/skills/sprint/SKILL.md` | Start or continue a full sprint of chained lots. |
+| 2 | **lot-test** | `.claude/skills/lot-test/SKILL.md` | Lot code complete — tests with coverage above the JaCoCo gate. |
+| 3 | **lot-audit** | `.claude/skills/lot-audit/SKILL.md` | After `lot-test` — security / performance / architecture audit. |
+| 4 | **lot-ship** | `.claude/skills/lot-ship/SKILL.md` | After `lot-audit` with no Critical — push + PR. |
+| 5 | **harness-sync** | `.claude/skills/harness-sync/SKILL.md` | Docs/harness drifted from code, or harness update/improvement requested. |
+| 6 | **dep-update** | `.claude/skills/dep-update/SKILL.md` | Before a PR or on demand — Maven dependency refresh (patch/minor auto, major on approval). |
+
+> Skills live under `.claude/skills/<name>/SKILL.md` — the directory the
+> Claude Code harness scans for project-scoped skills. Versioned in this
+> repo like any other project document (not gitignored, not global).
 
 **LOTD gate** (mandatory order per lot): `lot-test → lot-audit → lot-ship`
 
@@ -112,11 +116,11 @@ Every useful document of this project, kept current on every doc-touching change
 | `security.md` | Security posture and hardening notes |
 | `README.md` | Presentation, Quick start |
 | `HELP.md` | Spring Boot generated reference links |
-| `skill/i-have-adhd/SKILL.md` | enlight llm return |
-| `skill/sprint/SKILL.md` | Chain lots into a sprint |
-| `skill/lot-test/SKILL.md` | Test the current lot to the coverage gate |
-| `skill/lot-audit/SKILL.md` | Security/performance/architecture audit before ship |
-| `skill/lot-ship/SKILL.md` | Push + PR, gated on a passing audit |
-| `skill/harness-sync/SKILL.md` | Realign this harness with code reality |
-| `skill/dep-update/SKILL.md` | Maven dependency refresh |
+| `.claude/skills/i-have-adhd/SKILL.md` | enlight llm return |
+| `.claude/skills/sprint/SKILL.md` | Chain lots into a sprint |
+| `.claude/skills/lot-test/SKILL.md` | Test the current lot to the coverage gate |
+| `.claude/skills/lot-audit/SKILL.md` | Security/performance/architecture audit before ship |
+| `.claude/skills/lot-ship/SKILL.md` | Push + PR, gated on a passing audit |
+| `.claude/skills/harness-sync/SKILL.md` | Realign this harness with code reality |
+| `.claude/skills/dep-update/SKILL.md` | Maven dependency refresh |
 | `docs/audits/lot-XX.md` | Per-lot audit reports (one per shipped lot) |
